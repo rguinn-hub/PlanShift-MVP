@@ -1,7 +1,8 @@
 import { useState } from "react";
+import { ArrowLeft } from "lucide-react";
 import { supabase } from "../lib/supabase";
-import { CHANNELS, type Campaign } from "../lib/types";
-import { DEMO_CAMPAIGN, buildDemoTasks } from "../lib/demoData";
+import { CHANNELS, type Campaign, type Task } from "../lib/types";
+import { DEMO_CAMPAIGN, buildDemoTasks, initDemoState, saveDemoState } from "../lib/demoData";
 import type { LucideIcon } from "lucide-react";
 import { channelIcons } from "../lib/channels";
 import { Sparkles } from "lucide-react";
@@ -10,9 +11,10 @@ interface Props {
   userId: string;
   onCreated: (campaign: Campaign) => void;
   demoMode: boolean;
+  onGoHome: () => void;
 }
 
-export default function NewCampaign({ userId, onCreated, demoMode }: Props) {
+export default function NewCampaign({ userId, onCreated, demoMode, onGoHome }: Props) {
   const [businessName, setBusinessName] = useState("");
   const [businessBrief, setBusinessBrief] = useState("");
   const [targetAudience, setTargetAudience] = useState("");
@@ -41,6 +43,27 @@ export default function NewCampaign({ userId, onCreated, demoMode }: Props) {
     setLoading(true);
 
     try {
+      if (demoMode) {
+        const newCampaign: Campaign = {
+          id: crypto.randomUUID(),
+          user_id: "demo-user",
+          business_name: businessName,
+          business_brief: businessBrief,
+          target_audience: targetAudience,
+          goal,
+          channels,
+          start_date: startDate,
+          duration_days: parseInt(durationDays, 10),
+          created_at: new Date().toISOString(),
+        };
+        const demo = initDemoState();
+        const updatedCampaigns = [newCampaign, ...demo.campaigns];
+        const updatedTasks = { ...demo.tasksByCampaign, [newCampaign.id]: [] as Task[] };
+        saveDemoState(updatedCampaigns, updatedTasks);
+        onCreated(newCampaign);
+        return;
+      }
+
       const { data, error: insertError } = await supabase
         .from("campaigns")
         .insert({
@@ -100,6 +123,12 @@ export default function NewCampaign({ userId, onCreated, demoMode }: Props) {
     setLoading(true);
 
     try {
+      if (demoMode) {
+        const demo = initDemoState();
+        onCreated(demo.campaigns[0]);
+        return;
+      }
+
       const { data, error: insertError } = await supabase
         .from("campaigns")
         .insert({
@@ -134,11 +163,30 @@ export default function NewCampaign({ userId, onCreated, demoMode }: Props) {
     }
   };
 
+  const [hasChanges, setHasChanges] = useState(false);
+
+  const markChanged = () => setHasChanges(true);
+
+  const handleBackHome = () => {
+    if (hasChanges) {
+      if (!window.confirm("You have unsaved changes. Leave this form?")) return;
+    }
+    onGoHome();
+  };
+
   const today = new Date().toISOString().slice(0, 10);
 
   return (
     <div style={containerStyle}>
       <div style={cardStyle}>
+        <button
+          className="btn btn-ghost"
+          onClick={handleBackHome}
+          style={{ marginBottom: "var(--space-4)", padding: "var(--space-2) var(--space-3)", fontSize: 14, color: "var(--neutral-600)" }}
+        >
+          <ArrowLeft size={16} />
+          Back to Home
+        </button>
         <h1 style={{ fontSize: 24, fontWeight: 600, marginBottom: "var(--space-2)", color: "var(--neutral-900)" }}>
           New Campaign
         </h1>
@@ -148,7 +196,7 @@ export default function NewCampaign({ userId, onCreated, demoMode }: Props) {
 
         {demoMode && (
           <div style={demoBannerStyle}>
-            Demo mode — your campaign will be saved but you won't be able to return to it after exiting.
+            Demo changes are saved in this browser. Sign in to save a campaign to your account.
           </div>
         )}
 
@@ -158,7 +206,7 @@ export default function NewCampaign({ userId, onCreated, demoMode }: Props) {
             <input
               id="businessName"
               value={businessName}
-              onChange={(e) => setBusinessName(e.target.value)}
+              onChange={(e) => { setBusinessName(e.target.value); markChanged(); }}
               placeholder="e.g. The Velvet Thread"
               required
             />
@@ -169,7 +217,7 @@ export default function NewCampaign({ userId, onCreated, demoMode }: Props) {
             <textarea
               id="businessBrief"
               value={businessBrief}
-              onChange={(e) => setBusinessBrief(e.target.value)}
+              onChange={(e) => { setBusinessBrief(e.target.value); markChanged(); }}
               placeholder="What does your business do? What makes it unique?"
               required
             />
@@ -180,7 +228,7 @@ export default function NewCampaign({ userId, onCreated, demoMode }: Props) {
             <input
               id="targetAudience"
               value={targetAudience}
-              onChange={(e) => setTargetAudience(e.target.value)}
+              onChange={(e) => { setTargetAudience(e.target.value); markChanged(); }}
               placeholder="e.g. Style-conscious women who value curated, versatile pieces"
               required
             />
@@ -191,7 +239,7 @@ export default function NewCampaign({ userId, onCreated, demoMode }: Props) {
             <input
               id="goal"
               value={goal}
-              onChange={(e) => setGoal(e.target.value)}
+              onChange={(e) => { setGoal(e.target.value); markChanged(); }}
               placeholder="e.g. Sell out the Fall Capsule Collection launch"
               required
             />
@@ -207,7 +255,7 @@ export default function NewCampaign({ userId, onCreated, demoMode }: Props) {
                   <button
                     key={ch}
                     type="button"
-                    onClick={() => toggleChannel(ch)}
+                    onClick={() => { toggleChannel(ch); markChanged(); }}
                     style={selected ? channelBtnActive : channelBtn}
                   >
                     <Icon size={18} />
@@ -226,7 +274,7 @@ export default function NewCampaign({ userId, onCreated, demoMode }: Props) {
                 type="date"
                 value={startDate}
                 min={today}
-                onChange={(e) => setStartDate(e.target.value)}
+                onChange={(e) => { setStartDate(e.target.value); markChanged(); }}
                 required
               />
             </div>
@@ -238,7 +286,7 @@ export default function NewCampaign({ userId, onCreated, demoMode }: Props) {
                 min="3"
                 max="90"
                 value={durationDays}
-                onChange={(e) => setDurationDays(e.target.value)}
+                onChange={(e) => { setDurationDays(e.target.value); markChanged(); }}
                 required
               />
             </div>

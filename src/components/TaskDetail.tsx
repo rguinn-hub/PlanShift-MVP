@@ -1,14 +1,16 @@
-import { useState, useRef, useEffect } from "react";
-import { X, Check, Clock, Circle, Timer, Split, Plus, Pencil, Undo2 } from "lucide-react";
+import { useState } from "react";
+import { X, Check, Clock, Circle, Timer, Split, Plus, Pencil, Trash2 } from "lucide-react";
 import type { Task, MicroStep } from "../lib/types";
 import { CHANNELS, INTENT_TAGS } from "../lib/types";
 import { channelIcons, channelColors, intentTagColors, intentTagBg } from "../lib/channels";
+import { statusLabel, statusBg, statusBorder, statusText, statusPillBg, statusPillText, statusStrike } from "../lib/statusStyles";
 import type { LucideIcon } from "lucide-react";
 
 interface Props {
   task: Task;
   onClose: () => void;
   onUpdate: (taskId: string, updates: Partial<Task>) => void;
+  onDelete?: (taskId: string) => void;
 }
 
 const STATUS_OPTIONS: { value: Task["status"]; label: string; icon: typeof Clock }[] = [
@@ -17,12 +19,7 @@ const STATUS_OPTIONS: { value: Task["status"]; label: string; icon: typeof Clock
   { value: "done", label: "Done", icon: Check },
 ];
 
-interface DeletedStep {
-  step: MicroStep;
-  index: number;
-}
-
-export default function TaskDetail({ task, onClose, onUpdate }: Props) {
+export default function TaskDetail({ task, onClose, onUpdate, onDelete }: Props) {
   const [draftCopy, setDraftCopy] = useState(task.draft_copy || "");
   const [status, setStatus] = useState(task.status);
   const [editing, setEditing] = useState(false);
@@ -41,22 +38,7 @@ export default function TaskDetail({ task, onClose, onUpdate }: Props) {
 
   const [editError, setEditError] = useState<string | null>(null);
 
-  const [deletedSteps, setDeletedSteps] = useState<DeletedStep[]>([]);
-
-  const stepsRef = useRef<MicroStep[]>(steps);
-  stepsRef.current = steps;
-  const deletedStepsRef = useRef<DeletedStep[]>(deletedSteps);
-  deletedStepsRef.current = deletedSteps;
-
-  useEffect(() => {
-    return () => {
-      const currentDeleted = deletedStepsRef.current;
-      if (currentDeleted.length > 0) {
-        const currentSteps = stepsRef.current;
-        onUpdate(task.id, { micro_steps: currentSteps });
-      }
-    };
-  }, []);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const Icon: LucideIcon = channelIcons[task.channel] || channelIcons["Website"];
 
@@ -139,22 +121,16 @@ export default function TaskDetail({ task, onClose, onUpdate }: Props) {
   };
 
   const handleDeleteStep = (index: number) => {
-    const deletedStep = steps[index];
-    if (!deletedStep) return;
-
     const newSteps = steps.filter((_, i) => i !== index);
     setSteps(newSteps);
-    setDeletedSteps((prev) => [...prev, { step: deletedStep, index }]);
+    onUpdate(task.id, { micro_steps: newSteps });
   };
 
-  const handleUndoDelete = (deletedIndex: number) => {
-    const deleted = deletedSteps[deletedIndex];
-    if (!deleted) return;
-
-    const restoredSteps = [...steps];
-    restoredSteps.splice(deleted.index, 0, deleted.step);
-    setSteps(restoredSteps);
-    setDeletedSteps((prev) => prev.filter((_, i) => i !== deletedIndex));
+  const handleDelete = () => {
+    if (onDelete) {
+      onDelete(task.id);
+      onClose();
+    }
   };
 
   const dueDate = new Date(task.due_date + "T00:00:00").toLocaleDateString("en-US", {
@@ -165,7 +141,7 @@ export default function TaskDetail({ task, onClose, onUpdate }: Props) {
 
   return (
     <div style={overlayStyle} onClick={onClose}>
-      <div style={modalStyle} onClick={(e) => e.stopPropagation()}>
+      <div style={{ ...modalStyle, borderTop: `4px solid ${statusBorder(task.status)}` }} onClick={(e) => e.stopPropagation()}>
         <div style={modalHeaderStyle}>
           <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)", flex: 1, minWidth: 0 }}>
             <div style={{ ...iconDotStyle, background: channelColors[task.channel] || "var(--neutral-400)" }}>
@@ -250,6 +226,9 @@ export default function TaskDetail({ task, onClose, onUpdate }: Props) {
                   <h2 style={{ fontSize: 20, fontWeight: 600, color: "var(--neutral-900)" }}>
                     {task.title}
                   </h2>
+                  <span style={taskStatusPillStyle(task.status)}>
+                    {statusLabel[task.status]}
+                  </span>
                   {task.intent_tag && (
                     <span style={intentTagStyle(task.intent_tag)}>
                       {task.intent_tag}
@@ -261,6 +240,17 @@ export default function TaskDetail({ task, onClose, onUpdate }: Props) {
           </div>
           {!metaEditing && (
             <div style={{ display: "flex", alignItems: "center", gap: "var(--space-1)", flexShrink: 0 }}>
+              {onDelete && (
+                <button
+                  className="btn btn-ghost"
+                  onClick={() => setConfirmDelete(true)}
+                  style={{ padding: "var(--space-2)", color: "var(--error-500)" }}
+                  aria-label="Delete task"
+                  title="Delete task"
+                >
+                  <Trash2 size={16} />
+                </button>
+              )}
               <button
                 className="btn btn-ghost"
                 onClick={() => setMetaEditing(true)}
@@ -296,19 +286,6 @@ export default function TaskDetail({ task, onClose, onUpdate }: Props) {
                       onClick={() => handleDeleteStep(i)}
                     >
                       <X size={14} />
-                    </button>
-                  </div>
-                ))}
-                {deletedSteps.map((deleted, di) => (
-                  <div key={`del-${di}`} style={deletedRowStyle}>
-                    <span style={deletedTextStyle}>Step deleted</span>
-                    <button
-                      className="btn btn-ghost"
-                      style={{ padding: "var(--space-1) var(--space-2)", fontSize: 13, color: "var(--accent-700)", fontWeight: 600 }}
-                      onClick={() => handleUndoDelete(di)}
-                    >
-                      <Undo2 size={14} />
-                      Undo
                     </button>
                   </div>
                 ))}
@@ -403,6 +380,26 @@ export default function TaskDetail({ task, onClose, onUpdate }: Props) {
           </div>
         </div>
       </div>
+
+      {confirmDelete && (
+        <div style={overlayStyle} onClick={() => setConfirmDelete(false)}>
+          <div style={modalStyle} onClick={(e) => e.stopPropagation()}>
+            <div style={{ padding: "var(--space-6)", textAlign: "center" }}>
+              <Trash2 size={32} color="var(--error-500)" style={{ margin: "0 auto var(--space-4)" }} />
+              <h3 style={{ fontSize: 18, fontWeight: 600, color: "var(--neutral-900)", marginBottom: "var(--space-2)" }}>
+                Delete this task?
+              </h3>
+              <p style={{ color: "var(--neutral-500)", fontSize: 14, marginBottom: "var(--space-6)" }}>
+                "{task.title}" will be permanently removed.
+              </p>
+              <div style={{ display: "flex", gap: "var(--space-3)", justifyContent: "center" }}>
+                <button className="btn btn-secondary" onClick={() => setConfirmDelete(false)}>Cancel</button>
+                <button className="btn btn-danger" onClick={handleDelete}>Delete task</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -530,7 +527,7 @@ const stepRowStyle: React.CSSProperties = {
   gap: "var(--space-3)",
   padding: "var(--space-3)",
   borderRadius: "var(--radius-sm)",
-  background: "var(--neutral-50)",
+  background: "var(--neutral-100)",
   border: "1px solid var(--neutral-200)",
 };
 
@@ -573,7 +570,7 @@ const splitBoxStyle: React.CSSProperties = {
   padding: "var(--space-4)",
   borderRadius: "var(--radius-md)",
   border: "1px solid var(--neutral-200)",
-  background: "var(--neutral-50)",
+  background: "var(--neutral-100)",
 };
 
 const statusRowStyle: React.CSSProperties = {
@@ -602,8 +599,20 @@ const statusBtnActive: React.CSSProperties = {
   color: "var(--accent-700)",
 };
 
+const taskStatusPillStyle = (status: Task["status"]): React.CSSProperties => ({
+  display: "inline-block",
+  marginTop: "var(--space-2)",
+  fontSize: 11,
+  fontWeight: 600,
+  letterSpacing: "0.03em",
+  padding: "2px var(--space-2)",
+  borderRadius: "20px",
+  background: statusPillBg(status),
+  color: statusPillText(status),
+});
+
 const draftBoxStyle: React.CSSProperties = {
-  background: "var(--neutral-50)",
+  background: "var(--neutral-100)",
   border: "1px solid var(--neutral-200)",
   borderRadius: "var(--radius-sm)",
   padding: "var(--space-4)",
@@ -623,11 +632,4 @@ const deletedRowStyle: React.CSSProperties = {
   background: "var(--neutral-100)",
   border: "1px dashed var(--neutral-300)",
   opacity: 0.7,
-};
-
-const deletedTextStyle: React.CSSProperties = {
-  flex: 1,
-  fontSize: 14,
-  fontStyle: "italic",
-  color: "var(--neutral-400)",
 };

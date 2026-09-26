@@ -12,10 +12,16 @@ import {
   AlertCircle,
   Sparkles,
   ArrowRight,
+  Bell,
+  StickyNote,
+  Clock,
+  User,
+  MapPin,
+  FileText,
 } from "lucide-react";
 import { supabase } from "../lib/supabase";
-import type { Campaign, Task, Note, CampaignPhase } from "../lib/types";
-import { PHASES } from "../lib/types";
+import type { Campaign, Task, Note, CalendarItem, CampaignPhase, ReminderOffset } from "../lib/types";
+import { PHASES, REMINDER_OPTIONS } from "../lib/types";
 import { channelIcons, channelColors } from "../lib/channels";
 import {
   statusLabel,
@@ -27,11 +33,14 @@ import {
   statusStrike,
 } from "../lib/statusStyles";
 import type { LucideIcon } from "lucide-react";
+import CalendarAddModal, { type AddItemType } from "../components/CalendarAddModal";
+import { useReminders } from "../lib/useReminders";
 
 type ViewMode = "daily" | "weekly" | "monthly";
 
 interface Props {
   userId: string;
+  demoMode: boolean;
   campaigns: Campaign[];
   onOpenCampaign: (campaign: Campaign) => void;
   onCreateCampaign: () => void;
@@ -88,6 +97,7 @@ function getPhaseForDate(campaign: Campaign, date: Date): CampaignPhase | null {
 
 export default function HomeDashboard({
   userId,
+  demoMode,
   campaigns,
   onOpenCampaign,
   onCreateCampaign,
@@ -110,14 +120,24 @@ export default function HomeDashboard({
   const [noteError, setNoteError] = useState<string | null>(null);
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
   const [editingNoteText, setEditingNoteText] = useState("");
-  const [upcomingOpen, setUpcomingOpen] = useState(true);
-  const [launchedOpen, setLaunchedOpen] = useState(true);
+  const [upcomingOpen, setUpcomingOpen] = useState(false);
+  const [launchedOpen, setLaunchedOpen] = useState(false);
   const [campaignFilter, setCampaignFilter] = useState<string>("all");
   const [showAddTask, setShowAddTask] = useState(false);
   const [addTaskDate, setAddTaskDate] = useState<Date | null>(null);
+  const [addItemType, setAddItemType] = useState<AddItemType | null>(null);
   const [addTaskError, setAddTaskError] = useState<string | null>(null);
+  const [calendarItems, setCalendarItems] = useState<CalendarItem[]>([]);
+  const [showItemTypePicker, setShowItemTypePicker] = useState(false);
 
   const loadNotes = useCallback(async () => {
+    if (demoMode) {
+      const stored = localStorage.getItem("planshift-demo-notes");
+      if (stored) {
+        try { setNotes(JSON.parse(stored)); } catch { setNotes([]); }
+      }
+      return;
+    }
     const { data, error } = await supabase
       .from("notes")
       .select("*")
@@ -129,11 +149,37 @@ export default function HomeDashboard({
       return;
     }
     setNotes((data as Note[]) || []);
-  }, [userId]);
+  }, [userId, demoMode]);
 
   useEffect(() => {
     loadNotes();
   }, [loadNotes]);
+
+  const { activeReminders, dismissReminder } = useReminders(userId, demoMode);
+
+  const loadCalendarItems = useCallback(async () => {
+    if (demoMode) {
+      const stored = localStorage.getItem("planshift-demo-calendar-items");
+      if (stored) {
+        try { setCalendarItems(JSON.parse(stored)); } catch { setCalendarItems([]); }
+      }
+      return;
+    }
+    const { data, error } = await supabase
+      .from("calendar_items")
+      .select("*")
+      .eq("user_id", userId)
+      .order("due_date", { ascending: true });
+    if (error) {
+      console.error("Failed to load calendar items:", error.message);
+      return;
+    }
+    setCalendarItems((data as CalendarItem[]) || []);
+  }, [userId, demoMode]);
+
+  useEffect(() => {
+    loadCalendarItems();
+  }, [loadCalendarItems]);
 
   const allTasks = useMemo(() => {
     return Object.values(tasksByCampaign).flat();
@@ -212,6 +258,24 @@ export default function HomeDashboard({
     if (!noteText.trim()) return;
     setNoteSaving(true);
     setNoteError(null);
+    if (demoMode) {
+      const newNote: Note = {
+        id: crypto.randomUUID(),
+        user_id: "demo-user",
+        content: noteText.trim(),
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        scheduled_date: null,
+        scheduled_time: null,
+        reminder_offset: null,
+      };
+      const updated = [newNote, ...notes];
+      setNotes(updated);
+      localStorage.setItem("planshift-demo-notes", JSON.stringify(updated));
+      setNoteSaving(false);
+      setNoteText("");
+      return;
+    }
     const { data, error } = await supabase
       .from("notes")
       .insert({ user_id: userId, content: noteText.trim() })
@@ -229,6 +293,18 @@ export default function HomeDashboard({
   const handleUpdateNote = async (id: string) => {
     if (!editingNoteText.trim()) return;
     setNoteSaving(true);
+    setNoteError(null);
+    if (demoMode) {
+      const updated = notes.map((n) =>
+        n.id === id ? { ...n, content: editingNoteText.trim(), updated_at: new Date().toISOString() } : n
+      );
+      setNotes(updated);
+      localStorage.setItem("planshift-demo-notes", JSON.stringify(updated));
+      setNoteSaving(false);
+      setEditingNoteId(null);
+      setEditingNoteText("");
+      return;
+    }
     const { data, error } = await supabase
       .from("notes")
       .update({ content: editingNoteText.trim(), updated_at: new Date().toISOString() })
@@ -246,6 +322,13 @@ export default function HomeDashboard({
   };
 
   const handleDeleteNote = async (id: string) => {
+    setNoteError(null);
+    if (demoMode) {
+      const updated = notes.filter((n) => n.id !== id);
+      setNotes(updated);
+      localStorage.setItem("planshift-demo-notes", JSON.stringify(updated));
+      return;
+    }
     const { error } = await supabase.from("notes").delete().eq("id", id);
     if (error) {
       setNoteError("Failed to delete note.");
@@ -301,39 +384,102 @@ export default function HomeDashboard({
 
   const openAddTask = (date: Date) => {
     setAddTaskDate(date);
-    setShowAddTask(true);
+    setShowItemTypePicker(true);
     setAddTaskError(null);
   };
 
-  const hasNoCampaigns = campaigns.length === 0;
+  const handleItemTypeSelect = (type: AddItemType) => {
+    setShowItemTypePicker(false);
+    setAddItemType(type);
+    setShowAddTask(true);
+  };
 
-  if (hasNoCampaigns) {
-    return (
-      <div style={{ padding: "var(--space-6)", maxWidth: 1400, margin: "0 auto" }}>
-        <div style={emptyStateStyle}>
-          <div style={emptyIconStyle}>
-            <CalendarIcon size={32} color="var(--accent-600)" />
-          </div>
-          <h2 style={{ fontSize: 22, fontWeight: 600, color: "var(--neutral-900)", marginBottom: "var(--space-2)" }}>
-            Create Your First Campaign
-          </h2>
-          <p style={{ fontSize: 15, color: "var(--neutral-500)", marginBottom: "var(--space-6)", maxWidth: 400, textAlign: "center" }}>
-            Plan your next marketing campaign with AI-generated tasks, a phase calendar, and focus mode.
-          </p>
-          <div style={{ display: "flex", gap: "var(--space-3)", flexWrap: "wrap", justifyContent: "center" }}>
-            <button className="btn btn-primary btn-large" onClick={onCreateCampaign}>
-              <Plus size={18} />
-              Create Campaign
-            </button>
-            <button className="btn btn-secondary btn-large" onClick={onLoadDemo}>
-              <Sparkles size={18} />
-              Load demo campaign
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const handleGeneralItemCreate = async (item: {
+    item_type: "general_task" | "appointment";
+    title: string;
+    description: string | null;
+    due_date: string;
+    start_time: string | null;
+    end_time: string | null;
+    all_day: boolean;
+    location: string | null;
+    meeting_link: string | null;
+  }): Promise<boolean> => {
+    if (demoMode) {
+      const newItem: CalendarItem = {
+        id: crypto.randomUUID(),
+        user_id: "demo-user",
+        item_type: item.item_type,
+        title: item.title,
+        description: item.description,
+        due_date: item.due_date,
+        start_time: item.start_time,
+        end_time: item.end_time,
+        all_day: item.all_day,
+        location: item.location,
+        meeting_link: item.meeting_link,
+        status: "todo",
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      const updated = [...calendarItems, newItem];
+      setCalendarItems(updated);
+      localStorage.setItem("planshift-demo-calendar-items", JSON.stringify(updated));
+      return true;
+    }
+    const { data, error } = await supabase
+      .from("calendar_items")
+      .insert({ ...item, user_id: userId })
+      .select()
+      .single();
+    if (error) {
+      console.error("Failed to create calendar item:", error.message);
+      return false;
+    }
+    setCalendarItems((prev) => [...prev, data as CalendarItem]);
+    return true;
+  };
+
+  const handleNoteCreate = async (
+    content: string,
+    scheduledDate: string,
+    scheduledTime: string | null,
+    reminderOffset: ReminderOffset
+  ): Promise<boolean> => {
+    if (demoMode) {
+      const newNote: Note = {
+        id: crypto.randomUUID(),
+        user_id: "demo-user",
+        content,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        scheduled_date: scheduledDate,
+        scheduled_time: scheduledTime,
+        reminder_offset: reminderOffset,
+      };
+      const updated = [newNote, ...notes];
+      setNotes(updated);
+      localStorage.setItem("planshift-demo-notes", JSON.stringify(updated));
+      return true;
+    }
+    const { data, error } = await supabase
+      .from("notes")
+      .insert({
+        user_id: userId,
+        content,
+        scheduled_date: scheduledDate,
+        scheduled_time: scheduledTime,
+        reminder_offset: reminderOffset,
+      })
+      .select()
+      .single();
+    if (error) {
+      console.error("Failed to create note:", error.message);
+      return false;
+    }
+    setNotes((prev) => [data as Note, ...prev]);
+    return true;
+  };
 
   return (
     <div style={{ padding: "var(--space-6)", maxWidth: 1400, margin: "0 auto" }}>
@@ -465,7 +611,7 @@ export default function HomeDashboard({
                 onClick={() => setUpcomingOpen((v) => !v)}
                 style={accordionHeaderStyle}
               >
-                <ChevronDown size={16} style={{ transform: upcomingOpen ? "rotate(0deg)" : "rotate(-90deg)", transition: "transform 0.2s" }} />
+                <ChevronDown size={16} color="var(--neutral-700)" style={{ transform: upcomingOpen ? "rotate(0deg)" : "rotate(-90deg)", transition: "transform 0.2s" }} />
                 <span style={accordionTitleStyle}>Upcoming ({upcoming.length})</span>
               </button>
               {upcomingOpen && (
@@ -489,7 +635,7 @@ export default function HomeDashboard({
               onClick={() => setLaunchedOpen((v) => !v)}
               style={accordionHeaderStyle}
             >
-              <ChevronDown size={16} style={{ transform: launchedOpen ? "rotate(0deg)" : "rotate(-90deg)", transition: "transform 0.2s" }} />
+              <ChevronDown size={16} color="var(--neutral-700)" style={{ transform: launchedOpen ? "rotate(0deg)" : "rotate(-90deg)", transition: "transform 0.2s" }} />
               <span style={accordionTitleStyle}>Launched ({launched.length})</span>
             </button>
             {launchedOpen && (
@@ -678,21 +824,65 @@ export default function HomeDashboard({
         </div>
       </div>
 
-      {showAddTask && addTaskDate && (
-        <AddTaskModal
+      {showItemTypePicker && addTaskDate && (
+        <div style={overlayStyle} onClick={() => setShowItemTypePicker(false)}>
+          <div style={modalStyle} onClick={(e) => e.stopPropagation()}>
+            <div style={modalHeaderStyle}>
+              <h2 style={{ fontSize: 18, fontWeight: 600, color: "var(--neutral-900)" }}>Add to calendar</h2>
+              <button className="btn btn-ghost" onClick={() => setShowItemTypePicker(false)} style={{ padding: "var(--space-2)" }}>
+                <X size={20} />
+              </button>
+            </div>
+            <div style={{ padding: "var(--space-6)", display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
+              <button style={itemPickerBtnStyle} onClick={() => handleItemTypeSelect("campaign_task")}>
+                <div style={{ ...itemPickerIconStyle, background: "var(--accent-100)" }}><CalendarIcon size={18} color="var(--accent-700)" /></div>
+                <div><div style={itemPickerTitleStyle}>Campaign task</div><div style={itemPickerDescStyle}>Requires a campaign and channel</div></div>
+              </button>
+              <button style={itemPickerBtnStyle} onClick={() => handleItemTypeSelect("general_task")}>
+                <div style={{ ...itemPickerIconStyle, background: "var(--status-progress-bg)" }}><Check size={18} color="var(--status-progress-border)" /></div>
+                <div><div style={itemPickerTitleStyle}>General task</div><div style={itemPickerDescStyle}>No campaign needed</div></div>
+              </button>
+              <button style={itemPickerBtnStyle} onClick={() => handleItemTypeSelect("note")}>
+                <div style={{ ...itemPickerIconStyle, background: "var(--status-todo-bg)" }}><StickyNote size={18} color="var(--status-todo-border)" /></div>
+                <div><div style={itemPickerTitleStyle}>Note / reminder</div><div style={itemPickerDescStyle}>Quick note with optional reminder</div></div>
+              </button>
+              <button style={itemPickerBtnStyle} onClick={() => handleItemTypeSelect("appointment")}>
+                <div style={{ ...itemPickerIconStyle, background: "var(--urgency-orange-bg)" }}><Clock size={18} color="var(--urgency-orange)" /></div>
+                <div><div style={itemPickerTitleStyle}>Appointment</div><div style={itemPickerDescStyle}>Name, time, location, meeting link</div></div>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showAddTask && addTaskDate && addItemType && (
+        <CalendarAddModal
           date={addTaskDate}
           campaigns={campaigns}
-          onClose={() => { setShowAddTask(false); setAddTaskError(null); }}
-          onCreate={async (taskData) => {
+          demoMode={demoMode}
+          userId={userId}
+          itemType={addItemType}
+          onClose={() => { setShowAddTask(false); setAddItemType(null); setAddTaskError(null); }}
+          onCampaignTaskCreate={async (taskData) => {
             const created = await onTaskCreate(taskData);
-            if (created) {
-              setShowAddTask(false);
-              setAddTaskError(null);
-            }
+            if (created) { setShowAddTask(false); setAddItemType(null); setAddTaskError(null); }
+            return created;
           }}
-          error={addTaskError}
-          setError={setAddTaskError}
+          onGeneralItemCreate={async (item) => {
+            const ok = await handleGeneralItemCreate(item);
+            if (ok) { setShowAddTask(false); setAddItemType(null); }
+            return ok;
+          }}
+          onNoteCreate={async (content, scheduledDate, scheduledTime, reminderOffset) => {
+            const ok = await handleNoteCreate(content, scheduledDate, scheduledTime, reminderOffset);
+            if (ok) { setShowAddTask(false); setAddItemType(null); }
+            return ok;
+          }}
         />
+      )}
+
+      {activeReminders.length > 0 && (
+        <ReminderPopup reminders={activeReminders} onDismiss={dismissReminder} onOpen={() => {}} />
       )}
     </div>
   );
@@ -931,128 +1121,43 @@ function CompactCampaignRow({ campaign, tasks, onOpen }: { campaign: Campaign; t
   );
 }
 
-/* ---------- Add Task Modal ---------- */
-function AddTaskModal({ date, campaigns, onClose, onCreate, error, setError }: {
-  date: Date;
-  campaigns: Campaign[];
-  onClose: () => void;
-  onCreate: (task: Omit<Task, "id" | "created_at">) => Promise<void>;
-  error: string | null;
-  setError: (e: string | null) => void;
+/* ---------- Reminder Popup ---------- */
+function ReminderPopup({ reminders, onDismiss, onOpen }: {
+  reminders: import("../lib/types").Reminder[];
+  onDismiss: (id: string) => void;
+  onOpen: () => void;
 }) {
-  const [title, setTitle] = useState("");
-  const [campaignId, setCampaignId] = useState(campaigns.length > 0 ? campaigns[0].id : "");
-  const [channel, setChannel] = useState("");
-  const [dueDate, setDueDate] = useState(dateKey(date));
-  const [estMinutes, setEstMinutes] = useState("");
-  const [draftCopy, setDraftCopy] = useState("");
-  const [saving, setSaving] = useState(false);
-
-  const selectedCampaign = campaigns.find((c) => c.id === campaignId);
-  const availableChannels = selectedCampaign?.channels || [];
-
-  useEffect(() => {
-    if (availableChannels.length > 0 && !channel) {
-      setChannel(availableChannels[0]);
-    }
-  }, [availableChannels, channel]);
-
-  const handleCreate = async () => {
-    setError(null);
-    if (!title.trim()) { setError("Task title is required."); return; }
-    if (!campaignId) { setError("Please select a campaign."); return; }
-    if (!channel) { setError("Please select a channel."); return; }
-
-    const campaign = campaigns.find((c) => c.id === campaignId);
-    if (campaign) {
-      const campaignStart = new Date(campaign.start_date + "T00:00:00");
-      const campaignEnd = addDays(campaignStart, campaign.duration_days);
-      const taskDate = new Date(dueDate + "T00:00:00");
-      if (taskDate < campaignStart || taskDate >= campaignEnd) {
-        setError(`This date is outside the campaign range (${campaignStart.toLocaleDateString("en-US", { month: "short", day: "numeric" })} — ${campaignEnd.toLocaleDateString("en-US", { month: "short", day: "numeric" })}). Adjust the date or campaign dates.`);
-        return;
-      }
-    }
-
-    const parsedMinutes = estMinutes.trim() === "" ? null : Number.parseInt(estMinutes, 10);
-    if (parsedMinutes !== null && (!Number.isInteger(parsedMinutes) || parsedMinutes <= 0)) {
-      setError("Time estimate must be a positive whole number, or left blank.");
-      return;
-    }
-
-    const phase = campaign ? getPhaseForDate(campaign, new Date(dueDate + "T00:00:00")) : null;
-    const maxSort = selectedCampaign ? 0 : 0;
-
-    setSaving(true);
-    await onCreate({
-      campaign_id: campaignId,
-      title: title.trim(),
-      channel,
-      due_date: dueDate,
-      draft_copy: draftCopy.trim() || null,
-      status: "todo",
-      est_minutes: parsedMinutes,
-      intent_tag: null,
-      campaign_phase: phase,
-      micro_steps: null,
-      sort_order: maxSort,
-    });
-    setSaving(false);
-  };
-
+  if (reminders.length === 0) return null;
   return (
-    <div style={overlayStyle} onClick={onClose}>
-      <div style={modalStyle} onClick={(e) => e.stopPropagation()}>
-        <div style={modalHeaderStyle}>
-          <h2 style={{ fontSize: 18, fontWeight: 600, color: "var(--neutral-900)" }}>Add Task</h2>
-          <button className="btn btn-ghost" onClick={onClose} style={{ padding: "var(--space-2)" }}>
-            <X size={20} />
-          </button>
-        </div>
-        <div style={modalBodyStyle}>
-          {error && <div style={errorBoxStyle}>{error}</div>}
-          <div>
-            <label>Task title</label>
-            <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Write Instagram caption" autoFocus />
-          </div>
-          <div>
-            <label>Campaign</label>
-            <select value={campaignId} onChange={(e) => { setCampaignId(e.target.value); setChannel(""); }}>
-              {campaigns.map((c) => (
-                <option key={c.id} value={c.id}>{c.business_name}</option>
-              ))}
-            </select>
-          </div>
-          <div style={{ display: "flex", gap: "var(--space-3)" }}>
-            <div style={{ flex: 1 }}>
-              <label>Channel</label>
-              <select value={channel} onChange={(e) => setChannel(e.target.value)} disabled={availableChannels.length === 0}>
-                {availableChannels.map((ch) => (
-                  <option key={ch} value={ch}>{ch}</option>
-                ))}
-              </select>
+    <div style={reminderOverlayStyle}>
+      {reminders.slice(0, 3).map((r) => (
+        <div key={r.id} style={reminderCardStyle}>
+          <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
+            <div style={reminderIconStyle}>
+              <Bell size={20} color="var(--accent-700)" />
             </div>
-            <div style={{ flex: 1 }}>
-              <label>Due date</label>
-              <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <p style={reminderTitleStyle}>{r.item_title}</p>
+              <p style={reminderTimeStyle}>
+                {new Date(r.scheduled_for).toLocaleString("en-US", { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
+              </p>
             </div>
           </div>
-          <div>
-            <label>Estimated minutes (optional)</label>
-            <input type="number" min="1" value={estMinutes} onChange={(e) => setEstMinutes(e.target.value)} placeholder="e.g. 30" />
-          </div>
-          <div>
-            <label>Draft copy (optional)</label>
-            <textarea value={draftCopy} onChange={(e) => setDraftCopy(e.target.value)} placeholder="Notes or draft content..." style={{ minHeight: 80 }} />
-          </div>
-          <div style={{ display: "flex", gap: "var(--space-2)", justifyContent: "flex-end" }}>
-            <button className="btn btn-secondary" onClick={onClose}>Cancel</button>
-            <button className="btn btn-primary" onClick={handleCreate} disabled={saving}>
-              {saving ? "Saving..." : "Add Task"}
+          <div style={{ display: "flex", gap: "var(--space-2)", marginTop: "var(--space-3)" }}>
+            <button className="btn btn-primary" style={{ padding: "var(--space-2) var(--space-4)", fontSize: 14 }} onClick={onOpen}>
+              Open
+            </button>
+            <button className="btn btn-secondary" style={{ padding: "var(--space-2) var(--space-4)", fontSize: 14 }} onClick={() => onDismiss(r.id)}>
+              Dismiss
             </button>
           </div>
         </div>
-      </div>
+      ))}
+      {reminders.length > 3 && (
+        <p style={{ textAlign: "center", color: "var(--neutral-500)", fontSize: 13, marginTop: "var(--space-2)" }}>
+          +{reminders.length - 3} more reminders
+        </p>
+      )}
     </div>
   );
 }
@@ -1681,4 +1786,76 @@ const errorBoxStyle: React.CSSProperties = {
   borderRadius: "var(--radius-sm)",
   padding: "var(--space-3) var(--space-4)",
   fontSize: 14,
+};
+
+// Item type picker
+const itemPickerBtnStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: "var(--space-3)",
+  padding: "var(--space-4)",
+  borderRadius: "var(--radius-md)",
+  border: "1px solid var(--neutral-200)",
+  background: "var(--neutral-50)",
+  cursor: "pointer",
+  textAlign: "left",
+  transition: "border-color 0.15s",
+};
+const itemPickerIconStyle: React.CSSProperties = {
+  width: 40,
+  height: 40,
+  borderRadius: "var(--radius-sm)",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  flexShrink: 0,
+};
+const itemPickerTitleStyle: React.CSSProperties = {
+  fontSize: 15,
+  fontWeight: 600,
+  color: "var(--neutral-900)",
+};
+const itemPickerDescStyle: React.CSSProperties = {
+  fontSize: 13,
+  color: "var(--neutral-400)",
+  marginTop: 2,
+};
+
+// Reminder popup
+const reminderOverlayStyle: React.CSSProperties = {
+  position: "fixed",
+  bottom: "var(--space-6)",
+  right: "var(--space-6)",
+  zIndex: 200,
+  display: "flex",
+  flexDirection: "column",
+  gap: "var(--space-3)",
+  maxWidth: 360,
+};
+const reminderCardStyle: React.CSSProperties = {
+  background: "var(--neutral-0)",
+  borderRadius: "var(--radius-lg)",
+  border: "1px solid var(--accent-300)",
+  boxShadow: "var(--shadow-lg)",
+  padding: "var(--space-5)",
+};
+const reminderIconStyle: React.CSSProperties = {
+  width: 40,
+  height: 40,
+  borderRadius: "50%",
+  background: "var(--accent-50)",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  flexShrink: 0,
+};
+const reminderTitleStyle: React.CSSProperties = {
+  fontSize: 15,
+  fontWeight: 600,
+  color: "var(--neutral-900)",
+};
+const reminderTimeStyle: React.CSSProperties = {
+  fontSize: 13,
+  color: "var(--neutral-500)",
+  marginTop: 2,
 };

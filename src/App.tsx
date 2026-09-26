@@ -10,7 +10,7 @@ import Sidebar from "./components/Sidebar";
 import TaskDetail from "./components/TaskDetail";
 import type { Campaign, Task } from "./lib/types";
 import { Logo } from "./components/Logo";
-import { DEMO_CAMPAIGN, buildDemoTasks } from "./lib/demoData";
+import { DEMO_CAMPAIGN, buildDemoTasks, initDemoState, saveDemoState, buildAllDemoCampaigns } from "./lib/demoData";
 
 type Screen = "home" | "campaign" | "newCampaign";
 
@@ -63,6 +63,12 @@ export default function App() {
   }, [demoMode]);
 
   const loadCampaigns = useCallback(async () => {
+    if (demoMode) {
+      const demo = initDemoState();
+      setCampaigns(demo.campaigns);
+      setTasksByCampaign(demo.tasksByCampaign);
+      return;
+    }
     let query = supabase
       .from("campaigns")
       .select("*")
@@ -80,7 +86,7 @@ export default function App() {
     }
 
     setCampaigns((data as Campaign[]) || []);
-  }, [session]);
+  }, [session, demoMode]);
 
   useEffect(() => {
     if (session || demoMode) {
@@ -90,6 +96,7 @@ export default function App() {
 
   // Load all tasks for the user's campaigns (for dashboard)
   const loadAllTasks = useCallback(async () => {
+    if (demoMode) return;
     if (campaigns.length === 0) {
       setTasksByCampaign({});
       return;
@@ -113,7 +120,7 @@ export default function App() {
       byCampaign[t.campaign_id].push(t);
     }
     setTasksByCampaign(byCampaign);
-  }, [campaigns]);
+  }, [campaigns, demoMode]);
 
   useEffect(() => {
     if (screen === "home") {
@@ -127,7 +134,11 @@ export default function App() {
   };
 
   const handleCampaignCreated = (c: Campaign) => {
-    setCampaigns((prev) => [c, ...prev]);
+    setCampaigns((prev) => {
+      const updated = [c, ...prev];
+      if (demoMode) saveDemoState(updated, tasksByCampaign);
+      return updated;
+    });
     setActiveCampaign(c);
     setScreen("campaign");
   };
@@ -154,6 +165,22 @@ export default function App() {
 
   const handleDeleteCampaign = async (campaign: Campaign) => {
     const wasActive = activeCampaign?.id === campaign.id;
+
+    if (demoMode) {
+      const updatedCampaigns = campaigns.filter((c) => c.id !== campaign.id);
+      const updatedTasks: Record<string, Task[]> = {};
+      for (const [cid, tasks] of Object.entries(tasksByCampaign)) {
+        if (cid !== campaign.id) updatedTasks[cid] = tasks;
+      }
+      setCampaigns(updatedCampaigns);
+      setTasksByCampaign(updatedTasks);
+      saveDemoState(updatedCampaigns, updatedTasks);
+      if (wasActive) {
+        setActiveCampaign(null);
+        setScreen("home");
+      }
+      return;
+    }
 
     const { error } = await supabase
       .from("campaigns")
@@ -185,39 +212,28 @@ export default function App() {
   };
 
   const handleLoadDemo = async () => {
-    try {
-      const { data, error: insertError } = await supabase
-        .from("campaigns")
-        .insert({
-          business_name: DEMO_CAMPAIGN.business_name,
-          business_brief: DEMO_CAMPAIGN.business_brief,
-          target_audience: DEMO_CAMPAIGN.target_audience,
-          goal: DEMO_CAMPAIGN.goal,
-          channels: DEMO_CAMPAIGN.channels,
-          start_date: DEMO_CAMPAIGN.start_date,
-          duration_days: DEMO_CAMPAIGN.duration_days,
-        })
-        .select()
-        .single();
-
-      if (insertError) throw insertError;
-
-      const campaign = data as Campaign;
-      const tasks = buildDemoTasks(campaign.id);
-
-      const { error: taskError } = await supabase
-        .from("tasks")
-        .insert(tasks);
-
-      if (taskError) throw taskError;
-
-      handleCampaignCreated(campaign);
-    } catch (err) {
-      console.error("Failed to load demo:", err instanceof Error ? err.message : "Unknown error");
-    }
+    const demo = initDemoState();
+    setCampaigns(demo.campaigns);
+    setTasksByCampaign(demo.tasksByCampaign);
+    setScreen("home");
   };
 
   const handleTaskUpdate = async (taskId: string, updates: Partial<Task>) => {
+    setTasksByCampaign((prev) => {
+      const next: Record<string, Task[]> = {};
+      for (const [cid, tasks] of Object.entries(prev)) {
+        next[cid] = tasks.map((t) => (t.id === taskId ? { ...t, ...updates } : t));
+      }
+      if (demoMode) saveDemoState(campaigns, next);
+      return next;
+    });
+
+    setSelectedTask((prev) =>
+      prev && prev.id === taskId ? { ...prev, ...updates } : prev
+    );
+
+    if (demoMode) return;
+
     const { error } = await supabase
       .from("tasks")
       .update(updates)
@@ -227,21 +243,22 @@ export default function App() {
       console.error("Failed to update task:", error.message);
       return;
     }
-
-    setTasksByCampaign((prev) => {
-      const next: Record<string, Task[]> = {};
-      for (const [cid, tasks] of Object.entries(prev)) {
-        next[cid] = tasks.map((t) => (t.id === taskId ? { ...t, ...updates } : t));
-      }
-      return next;
-    });
-
-    setSelectedTask((prev) =>
-      prev && prev.id === taskId ? { ...prev, ...updates } : prev
-    );
   };
 
   const handleTaskDelete = async (taskId: string) => {
+    setTasksByCampaign((prev) => {
+      const next: Record<string, Task[]> = {};
+      for (const [cid, tasks] of Object.entries(prev)) {
+        next[cid] = tasks.filter((t) => t.id !== taskId);
+      }
+      if (demoMode) saveDemoState(campaigns, next);
+      return next;
+    });
+
+    setSelectedTask(null);
+
+    if (demoMode) return;
+
     const { error } = await supabase
       .from("tasks")
       .delete()
@@ -251,19 +268,24 @@ export default function App() {
       console.error("Failed to delete task:", error.message);
       return;
     }
-
-    setTasksByCampaign((prev) => {
-      const next: Record<string, Task[]> = {};
-      for (const [cid, tasks] of Object.entries(prev)) {
-        next[cid] = tasks.filter((t) => t.id !== taskId);
-      }
-      return next;
-    });
-
-    setSelectedTask(null);
   };
 
   const handleTaskCreate = async (taskData: Omit<Task, "id" | "created_at">): Promise<Task | null> => {
+    if (demoMode) {
+      const newTask: Task = {
+        ...taskData,
+        id: crypto.randomUUID(),
+        created_at: new Date().toISOString(),
+      };
+      setTasksByCampaign((prev) => {
+        const existing = prev[taskData.campaign_id] || [];
+        const next = { ...prev, [taskData.campaign_id]: [...existing, newTask] };
+        saveDemoState(campaigns, next);
+        return next;
+      });
+      return newTask;
+    }
+
     const { data, error } = await supabase
       .from("tasks")
       .insert(taskData)
@@ -348,15 +370,17 @@ export default function App() {
         </header>
       )}
 
-      {screen === "newCampaign" || (campaigns.length === 0 && screen !== "home") ? (
+      {screen === "newCampaign" ? (
         <NewCampaign
           userId={session?.user.id || "demo-user"}
           onCreated={handleCampaignCreated}
           demoMode={demoMode}
+          onGoHome={handleGoHome}
         />
       ) : screen === "home" ? (
         <HomeDashboard
           userId={session?.user.id || "demo-user"}
+          demoMode={demoMode}
           campaigns={campaigns}
           onOpenCampaign={handleOpenCampaign}
           onCreateCampaign={handleNewCampaign}
@@ -373,10 +397,15 @@ export default function App() {
           mode={view}
           demoMode={demoMode}
           onCampaignUpdated={handleCampaignUpdated}
+          initialTasks={tasksByCampaign[activeCampaign.id] || []}
+          onTaskUpdateExternal={handleTaskUpdate}
+          allCampaigns={campaigns}
+          allTasks={tasksByCampaign}
         />
       ) : (
         <HomeDashboard
           userId={session?.user.id || "demo-user"}
+          demoMode={demoMode}
           campaigns={campaigns}
           onOpenCampaign={handleOpenCampaign}
           onCreateCampaign={handleNewCampaign}
@@ -406,19 +435,21 @@ export default function App() {
           task={selectedTask}
           onClose={() => setSelectedTask(null)}
           onUpdate={handleTaskUpdate}
+          onDelete={handleTaskDelete}
         />
       )}
     </div>
   );
 }
 
-function TaskDetailModal({ task, onClose, onUpdate }: {
+function TaskDetailModal({ task, onClose, onUpdate, onDelete }: {
   task: Task;
   onClose: () => void;
   onUpdate: (taskId: string, updates: Partial<Task>) => void;
+  onDelete: (taskId: string) => void;
 }) {
   return (
-    <TaskDetail task={task} onClose={onClose} onUpdate={onUpdate} />
+    <TaskDetail task={task} onClose={onClose} onUpdate={onUpdate} onDelete={onDelete} />
   );
 }
 

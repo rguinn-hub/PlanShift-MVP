@@ -17,7 +17,49 @@ export interface Note {
   content: string;
   created_at: string;
   updated_at: string;
+  scheduled_date: string | null;
+  scheduled_time: string | null;
+  reminder_offset: string | null;
 }
+
+export interface CalendarItem {
+  id: string;
+  user_id: string;
+  item_type: "general_task" | "appointment";
+  title: string;
+  description: string | null;
+  due_date: string;
+  start_time: string | null;
+  end_time: string | null;
+  all_day: boolean;
+  location: string | null;
+  meeting_link: string | null;
+  status: "todo" | "in_progress" | "done";
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Reminder {
+  id: string;
+  user_id: string;
+  item_type: "campaign_task" | "general_task" | "note" | "appointment";
+  item_id: string;
+  item_title: string;
+  scheduled_for: string;
+  reminder_offset: string | null;
+  dismissed: boolean;
+  created_at: string;
+}
+
+export type ReminderOffset = "none" | "at_time" | "10min" | "1hour" | "1day";
+
+export const REMINDER_OPTIONS: { value: ReminderOffset; label: string }[] = [
+  { value: "none", label: "No reminder" },
+  { value: "at_time", label: "At the scheduled time" },
+  { value: "10min", label: "10 minutes before" },
+  { value: "1hour", label: "1 hour before" },
+  { value: "1day", label: "1 day before" },
+];
 
 export interface MicroStep {
   text: string;

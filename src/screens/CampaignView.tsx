@@ -13,15 +13,20 @@ interface Props {
   mode: "standard" | "focus";
   demoMode: boolean;
   onCampaignUpdated: (campaign: Campaign) => void;
+  initialTasks?: Task[];
+  onTaskUpdateExternal?: (taskId: string, updates: Partial<Task>) => void;
+  allCampaigns?: Campaign[];
+  allTasks?: Record<string, Task[]>;
 }
 
-export default function CampaignView({ campaign, mode, onCampaignUpdated }: Props) {
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [loading, setLoading] = useState(true);
+export default function CampaignView({ campaign, mode, demoMode, onCampaignUpdated, initialTasks, onTaskUpdateExternal, allCampaigns, allTasks }: Props) {
+  const [tasks, setTasks] = useState<Task[]>(initialTasks || []);
+  const [loading, setLoading] = useState(demoMode ? false : true);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [editingCampaign, setEditingCampaign] = useState(false);
 
   const loadTasks = useCallback(async () => {
+    if (demoMode) return;
     const { data, error } = await supabase
       .from("tasks")
       .select("*")
@@ -35,13 +40,30 @@ export default function CampaignView({ campaign, mode, onCampaignUpdated }: Prop
 
     setTasks((data as Task[]) || []);
     setLoading(false);
-  }, [campaign.id]);
+  }, [campaign.id, demoMode]);
 
   useEffect(() => {
-    loadTasks();
-  }, [loadTasks]);
+    if (demoMode && initialTasks) {
+      setTasks(initialTasks);
+      setLoading(false);
+    } else {
+      loadTasks();
+    }
+  }, [loadTasks, demoMode, initialTasks]);
 
   const handleTaskUpdate = async (taskId: string, updates: Partial<Task>) => {
+    setTasks((prev) =>
+      prev.map((t) => (t.id === taskId ? { ...t, ...updates } : t))
+    );
+    setSelectedTask((prev) =>
+      prev && prev.id === taskId ? { ...prev, ...updates } : prev
+    );
+
+    if (demoMode && onTaskUpdateExternal) {
+      onTaskUpdateExternal(taskId, updates);
+      return;
+    }
+
     const { error } = await supabase
       .from("tasks")
       .update(updates)
@@ -51,13 +73,6 @@ export default function CampaignView({ campaign, mode, onCampaignUpdated }: Prop
       console.error("Failed to update task:", error.message);
       return;
     }
-
-    setTasks((prev) =>
-      prev.map((t) => (t.id === taskId ? { ...t, ...updates } : t))
-    );
-    setSelectedTask((prev) =>
-      prev && prev.id === taskId ? { ...prev, ...updates } : prev
-    );
   };
 
   if (loading) {
@@ -113,6 +128,9 @@ export default function CampaignView({ campaign, mode, onCampaignUpdated }: Prop
               setEditingCampaign(false);
             }}
             onClose={() => setEditingCampaign(false)}
+            demoMode={demoMode}
+            allCampaigns={allCampaigns}
+            allTasks={allTasks}
           />
         )}
       </>
@@ -168,6 +186,9 @@ export default function CampaignView({ campaign, mode, onCampaignUpdated }: Prop
             setEditingCampaign(false);
           }}
           onClose={() => setEditingCampaign(false)}
+          demoMode={demoMode}
+          allCampaigns={allCampaigns}
+          allTasks={allTasks}
         />
       )}
     </div>

@@ -315,9 +315,9 @@ label {
   --status-done-pill-bg: #2e2e2e;
   --status-done-pill-text: #e5e7eb;
 
-  --melon-bg: #3a2418;
-  --melon-border: #f4b8a6;
-  --melon-text: #fce3dc;
+  --melon-bg: #FCE3DC;
+  --melon-border: #F4B8A6;
+  --melon-text: #1a2238;
 }
 
 @media (prefers-reduced-motion: reduce) {

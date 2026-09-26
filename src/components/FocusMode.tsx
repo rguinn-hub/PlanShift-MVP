@@ -79,15 +79,7 @@ export default function FocusMode({ tasks, onTaskClick, onTaskUpdate }: Props) {
     onTaskUpdate(doFirst.id, { micro_steps: updatedSteps });
   };
 
-  const isDueOrOverdue = (task: Task): boolean => {
-    if (task.status === "done") return false;
-    const due = new Date(task.due_date + "T00:00:00");
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    return due <= today;
-  };
-
-  const heroIsMelon = doFirst ? isDueOrOverdue(doFirst) : false;
+  const heroIsMelon = true;
 
   if (!doFirst) {
     return (
@@ -123,9 +115,11 @@ export default function FocusMode({ tasks, onTaskClick, onTaskUpdate }: Props) {
     : extractMicroStep(doFirst);
   const Icon: LucideIcon = channelIcons[doFirst.channel] || channelIcons["Website"];
 
-  const heroCardFinalStyle: React.CSSProperties = heroIsMelon
-    ? { ...heroCardStyle, borderLeft: `4px solid var(--melon-border)`, background: "var(--melon-bg)" }
-    : { ...heroCardStyle, borderLeft: `4px solid ${urgencyColors[heroUrgency].border}` };
+  const heroCardFinalStyle: React.CSSProperties = {
+    ...heroCardStyle,
+    borderLeft: `4px solid var(--melon-border)`,
+    background: "var(--melon-bg)",
+  };
 
   return (
     <div style={containerStyle}>
@@ -159,12 +153,12 @@ export default function FocusMode({ tasks, onTaskClick, onTaskUpdate }: Props) {
 
       {/* Do this first */}
       <div
-        className={heroIsMelon ? "urgency-pulse" : undefined}
+        className={undefined}
         style={heroCardFinalStyle}
       >
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <p style={{ ...heroLabelStyle, color: heroIsMelon ? "var(--melon-text)" : urgencyColors[heroUrgency].border }}>
-            {heroIsMelon ? "Due now" : urgencyColors[heroUrgency].label}
+          <p style={{ ...heroLabelStyle, color: "var(--melon-text)" }}>
+            {urgencyColors[heroUrgency].label}
           </p>
           <span style={heroStatusPillStyle(doFirst.status)}>
             {statusLabel[doFirst.status]}
@@ -374,26 +368,16 @@ function extractMicroStep(task: Task): string | null {
 
 function FocusTaskRow({ task, onClick }: { task: Task; onClick: () => void }) {
   const Icon: LucideIcon = channelIcons[task.channel] || channelIcons["Website"];
-  const urgency = getUrgencyLevel(task);
-  const uc = urgencyColors[urgency];
-  const dueToday = (() => {
-    const due = new Date(task.due_date + "T00:00:00");
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    return due <= today;
-  })();
-  const borderColor = dueToday ? "var(--melon-border)" : uc.border;
   return (
     <button
-      className={dueToday ? "urgency-pulse" : undefined}
-      style={{ ...rowStyle, borderLeft: `3px solid ${borderColor}` }}
+      style={{ ...rowStyle, background: statusBg(task.status), border: `1px solid ${statusBorder(task.status)}` }}
       onClick={onClick}
     >
       <div style={{ ...rowDotStyle, background: channelColors[task.channel] || "var(--neutral-400)" }}>
         <Icon size={12} color="var(--neutral-0)" />
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={rowTitleStyle}>{task.title}</div>
+        <div style={{ ...rowTitleStyle, color: statusText(task.status), textDecoration: statusStrike(task.status) }}>{task.title}</div>
         <div style={rowMetaStyle}>
           {task.channel}
           {task.est_minutes != null && ` · ${task.est_minutes}m`}

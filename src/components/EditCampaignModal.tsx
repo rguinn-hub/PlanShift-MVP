@@ -3,15 +3,19 @@ import { X } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import { CHANNELS, type Campaign } from "../lib/types";
 import { channelIcons } from "../lib/channels";
+import { saveDemoState } from "../lib/demoData";
 import type { LucideIcon } from "lucide-react";
 
 interface Props {
   campaign: Campaign;
   onSaved: (campaign: Campaign) => void;
   onClose: () => void;
+  demoMode?: boolean;
+  allCampaigns?: Campaign[];
+  allTasks?: Record<string, import("../lib/types").Task[]>;
 }
 
-export default function EditCampaignModal({ campaign, onSaved, onClose }: Props) {
+export default function EditCampaignModal({ campaign, onSaved, onClose, demoMode, allCampaigns, allTasks }: Props) {
   const [businessName, setBusinessName] = useState(campaign.business_name);
   const [businessBrief, setBusinessBrief] = useState(campaign.business_brief);
   const [targetAudience, setTargetAudience] = useState(campaign.target_audience);
@@ -54,6 +58,15 @@ export default function EditCampaignModal({ campaign, onSaved, onClose }: Props)
       start_date: startDate,
       duration_days: parsedDuration,
     };
+
+    if (demoMode) {
+      const updatedCampaign: Campaign = { ...campaign, ...updates };
+      const updatedCampaigns = (allCampaigns || []).map((c) => c.id === campaign.id ? updatedCampaign : c);
+      saveDemoState(updatedCampaigns, allTasks || {});
+      onSaved(updatedCampaign);
+      setSaving(false);
+      return;
+    }
 
     const { data, error: updateError } = await supabase
       .from("campaigns")
