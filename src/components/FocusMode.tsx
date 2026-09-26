@@ -626,7 +626,7 @@ const heroDotStyle: React.CSSProperties = {
 const heroChannelStyle: React.CSSProperties = {
   fontSize: 13,
   fontWeight: 500,
-  color: "var(--neutral-500)",
+  color: "var(--melon-text)",
   textTransform: "uppercase",
   letterSpacing: "0.03em",
 };
@@ -644,7 +644,7 @@ const heroIntentTagStyle = (tag: string): React.CSSProperties => ({
 const heroTitleStyle: React.CSSProperties = {
   fontSize: 26,
   fontWeight: 600,
-  color: "var(--neutral-900)",
+  color: "var(--melon-text)",
   lineHeight: 1.3,
 };
 
@@ -696,7 +696,8 @@ const heroMetaItem: React.CSSProperties = {
   alignItems: "center",
   gap: "var(--space-1)",
   fontSize: 14,
-  color: "var(--neutral-400)",
+  color: "var(--melon-text)",
+  opacity: 0.8,
 };
 
 const startBtnStyle: React.CSSProperties = {

@@ -6,6 +6,7 @@ import AuthScreen from "./screens/AuthScreen";
 import NewCampaign from "./screens/NewCampaign";
 import CampaignView from "./screens/CampaignView";
 import HomeDashboard from "./screens/HomeDashboard";
+import FocusMode from "./components/FocusMode";
 import Sidebar from "./components/Sidebar";
 import TaskDetail from "./components/TaskDetail";
 import type { Campaign, Task } from "./lib/types";
@@ -346,7 +347,7 @@ export default function App() {
           <button className="btn btn-ghost" onClick={toggleDarkMode} style={{ padding: "var(--space-2)" }} aria-label="Toggle dark mode">
             {darkMode ? <Sun size={18} /> : <Moon size={18} />}
           </button>
-          {screen === "campaign" && activeCampaign && (
+          {screen !== "newCampaign" && (
             <div style={toggleStyle}>
               <button
                 className="btn"
@@ -377,6 +378,14 @@ export default function App() {
           demoMode={demoMode}
           onGoHome={handleGoHome}
         />
+      ) : screen === "home" && view === "focus" ? (
+        <div style={{ padding: "var(--space-6)", maxWidth: 720, margin: "0 auto" }}>
+          <FocusMode
+            tasks={Object.values(tasksByCampaign).flat()}
+            onTaskClick={setSelectedTask}
+            onTaskUpdate={handleTaskUpdate}
+          />
+        </div>
       ) : screen === "home" ? (
         <HomeDashboard
           userId={session?.user.id || "demo-user"}
