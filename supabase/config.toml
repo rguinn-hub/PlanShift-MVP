@@ -1,0 +1,2 @@
+[functions.generate-tasks]
+verify_jwt = true

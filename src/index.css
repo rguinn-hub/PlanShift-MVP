@@ -1,0 +1,277 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap");
+
+:root {
+  /* PlanShift teal-to-green brand ramp */
+  --accent-50: #edfcf8;
+  --accent-100: #d4f8ed;
+  --accent-200: #a9efda;
+  --accent-300: #6de0bf;
+  --accent-400: #29ceb0;
+  --accent-500: #08bea0;
+  --accent-600: #00a989;
+  --accent-700: #00856f;
+  --accent-800: #006b60;
+  --accent-900: #00574f;
+
+  /* To-do card accent (lavender in dark mode) */
+  --todo-accent: var(--neutral-300);
+  --todo-bg: var(--neutral-100);
+  --todo-text: var(--neutral-500);
+
+  /* PlanShift navy neutral ramp */
+  --neutral-0: #ffffff;
+  --neutral-50: #f7f9fb;
+  --neutral-100: #edf1f5;
+  --neutral-200: #dbe2e9;
+  --neutral-300: #c2cdd7;
+  --neutral-400: #8b9aaa;
+  --neutral-500: #607084;
+  --neutral-600: #42546a;
+  --neutral-700: #2b3d56;
+  --neutral-800: #172943;
+  --neutral-900: #0d1b33;
+
+  --success-50: #edfcf8;
+  --success-500: #08bea0;
+  --success-600: #00a989;
+
+  --warning-50: #faf7ed;
+  --warning-500: #c49a3a;
+
+  --error-50: #f7eded;
+  --error-500: #c44a4a;
+  --error-600: #a83a3a;
+  --error-700: #8b2e2e;
+
+  /* Urgency colors */
+  --urgency-red: #dc2626;
+  --urgency-red-bg: #fef2f2;
+  --urgency-orange: #ea580c;
+  --urgency-orange-bg: #fff7ed;
+  --urgency-yellow: #ca8a04;
+  --urgency-yellow-bg: #fefce8;
+  --urgency-green: #16a34a;
+  --urgency-green-bg: #f0fdf4;
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+
+  --shadow-sm: 0 1px 2px rgba(13, 27, 51, 0.06);
+  --shadow-md: 0 4px 12px rgba(13, 27, 51, 0.10);
+  --shadow-lg: 0 12px 32px rgba(13, 27, 51, 0.16);
+
+  --font-body: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--neutral-900);
+  background: var(--neutral-0);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+button,
+input,
+textarea,
+select {
+  font-family: inherit;
+  font-size: inherit;
+}
+
+button {
+  cursor: pointer;
+  border: none;
+  background: none;
+}
+
+input,
+textarea,
+select {
+  border: 1px solid var(--neutral-300);
+  border-radius: var(--radius-sm);
+  padding: var(--space-3) var(--space-4);
+  width: 100%;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  background: var(--neutral-0);
+  color: var(--neutral-900);
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  outline: none;
+  border-color: var(--accent-400);
+  box-shadow: 0 0 0 3px var(--accent-100);
+}
+
+textarea {
+  resize: vertical;
+  min-height: 100px;
+  line-height: 1.6;
+}
+
+label {
+  font-weight: 500;
+  color: var(--neutral-700);
+  display: block;
+  margin-bottom: var(--space-2);
+  font-size: 14px;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-5);
+  border-radius: var(--radius-sm);
+  font-weight: 500;
+  font-size: 15px;
+  transition: background-color 0.2s, color 0.2s, border-color 0.2s, opacity 0.2s;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: var(--accent-600);
+  color: var(--neutral-0);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--accent-700);
+}
+
+.btn-secondary {
+  background: var(--neutral-100);
+  color: var(--neutral-700);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: var(--neutral-200);
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--neutral-600);
+}
+
+.btn-ghost:hover:not(:disabled) {
+  background: var(--neutral-100);
+}
+
+.btn-danger {
+  background: var(--error-600);
+  color: var(--neutral-0);
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: var(--error-700);
+}
+
+.campaign-delete-btn:hover {
+  color: var(--error-600);
+  background: var(--error-50);
+}
+
+.btn-large {
+  padding: var(--space-4) var(--space-6);
+  font-size: 16px;
+}
+
+.card {
+  background: var(--neutral-0);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--neutral-200);
+  box-shadow: var(--shadow-sm);
+}
+
+@keyframes gentle-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(234, 88, 12, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(234, 88, 12, 0);
+  }
+}
+
+.urgency-pulse {
+  animation: gentle-pulse 2s ease-in-out infinite;
+}
+
+@keyframes timer-ring {
+  from { stroke-dashoffset: 0; }
+  to { stroke-dashoffset: 283; }
+}
+
+.dark {
+  --neutral-0: #1a1a1a;
+  --neutral-50: #242424;
+  --neutral-100: #2e2e2e;
+  --neutral-200: #3a3a3a;
+  --neutral-300: #4a4a4a;
+  --neutral-400: #6b7280;
+  --neutral-500: #9ca3af;
+  --neutral-600: #c2cdd7;
+  --neutral-700: #d1d5db;
+  --neutral-800: #e5e7eb;
+  --neutral-900: #f3f4f6;
+
+  --error-50: #3a2020;
+  --warning-50: #3a3520;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.5);
+
+  --urgency-red-bg: #3a2020;
+  --urgency-orange-bg: #3a2a18;
+  --urgency-yellow-bg: #3a3618;
+  --urgency-green-bg: #1a3a28;
+
+  --todo-accent: #a78bfa;
+  --todo-bg: #1e1b4b;
+  --todo-text: #c4b5fd;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
