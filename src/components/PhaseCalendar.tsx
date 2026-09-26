@@ -2,6 +2,15 @@ import { useMemo } from "react";
 import type { Task, CampaignPhase } from "../lib/types";
 import { PHASES } from "../lib/types";
 import { channelIcons, channelColors, intentTagColors, intentTagBg } from "../lib/channels";
+import {
+  statusLabel,
+  statusBg,
+  statusBorder,
+  statusText,
+  statusPillBg,
+  statusPillText,
+  statusStrike,
+} from "../lib/statusStyles";
 import type { LucideIcon } from "lucide-react";
 
 interface Props {
@@ -22,35 +31,6 @@ const phaseColors: Record<CampaignPhase, string> = {
   "Launch": "#2c6e6e",
   "Momentum": "#245858",
 };
-
-const statusAccent: Record<string, string> = {
-  done: "var(--neutral-900)",
-  in_progress: "var(--accent-600)",
-  todo: "var(--todo-accent)",
-};
-
-const statusPillBg: Record<string, string> = {
-  done: "var(--neutral-100)",
-  in_progress: "var(--accent-50)",
-  todo: "var(--todo-bg)",
-};
-
-const statusPillText: Record<string, string> = {
-  done: "var(--neutral-900)",
-  in_progress: "var(--accent-700)",
-  todo: "var(--todo-text)",
-};
-
-const statusPillLabel: Record<string, string> = {
-  done: "Done",
-  in_progress: "In Progress",
-  todo: "To-Do",
-};
-
-function normalizeStatus(status: string): string {
-  if (status === "doing") return "in_progress";
-  return status;
-}
 
 export default function PhaseCalendar({ tasks, startDate, durationDays, onTaskClick }: Props) {
   const phases = useMemo<PhaseGroup[]>(() => {
@@ -86,23 +66,21 @@ export default function PhaseCalendar({ tasks, startDate, durationDays, onTaskCl
             <div style={taskGridStyle}>
               {phase.tasks.map((task) => {
                 const Icon: LucideIcon = channelIcons[task.channel] || channelIcons["Website"];
-                const status = normalizeStatus(task.status);
-                const accent = statusAccent[status] || statusAccent.todo;
                 return (
                   <button
                     key={task.id}
                     onClick={() => onTaskClick(task)}
-                    style={taskCardStyle(status)}
+                    style={taskCardStyle(task.status)}
                   >
-                    <div style={topBarStyle(accent)} />
-                    <div style={leftBarStyle(accent)} />
+                    <div style={topBarStyle(task.status)} />
+                    <div style={leftBarStyle(task.status)} />
                     <div style={cardTopRowStyle}>
-                      <div style={{ ...dotStyle, background: status === "done" ? "var(--neutral-900)" : (channelColors[task.channel] || "var(--neutral-400)") }}>
+                      <div style={{ ...dotStyle, background: task.status === "done" ? "var(--neutral-900)" : (channelColors[task.channel] || "var(--neutral-400)") }}>
                         <Icon size={12} color="var(--neutral-0)" />
                       </div>
                       <span style={channelNameStyle}>{task.channel}</span>
-                      <span style={statusPillStyle(status)}>
-                        {statusPillLabel[status] || statusPillLabel.todo}
+                      <span style={statusPillStyle(task.status)}>
+                        {statusLabel[task.status]}
                       </span>
                     </div>
                     {task.intent_tag && (
@@ -110,7 +88,7 @@ export default function PhaseCalendar({ tasks, startDate, durationDays, onTaskCl
                         {task.intent_tag}
                       </span>
                     )}
-                    <div style={taskTitleStyle(status)}>
+                    <div style={taskTitleStyle(task.status)}>
                       {task.title}
                     </div>
                     <div style={dueStyle}>
@@ -169,7 +147,7 @@ const taskGridStyle: React.CSSProperties = {
   gap: "var(--space-3)",
 };
 
-const taskCardStyle = (status: string): React.CSSProperties => ({
+const taskCardStyle = (status: Task["status"]): React.CSSProperties => ({
   position: "relative",
   display: "flex",
   flexDirection: "column",
@@ -177,43 +155,31 @@ const taskCardStyle = (status: string): React.CSSProperties => ({
   padding: "var(--space-4)",
   paddingTop: "calc(var(--space-4) + 3px)",
   borderRadius: "var(--radius-md)",
-  border: status === "done"
-    ? "1px solid var(--neutral-700)"
-    : status === "in_progress"
-      ? "1px solid var(--accent-500)"
-      : "1px solid var(--todo-accent)",
-  background: status === "done"
-    ? "var(--neutral-50)"
-    : status === "in_progress"
-      ? "var(--accent-50)"
-      : "var(--todo-bg)",
+  border: `1px solid ${statusBorder(status)}`,
+  background: statusBg(status),
   textAlign: "left",
   transition: "border-color 0.2s, box-shadow 0.2s, transform 0.15s",
   cursor: "pointer",
   overflow: "hidden",
-  boxShadow: status === "in_progress"
-    ? "0 1px 4px rgba(8, 190, 160, 0.12)"
-    : status === "done"
-      ? "0 1px 4px rgba(13, 27, 51, 0.10)"
-      : "var(--shadow-sm)",
+  boxShadow: "var(--shadow-sm)",
 });
 
-const topBarStyle = (color: string): React.CSSProperties => ({
+const topBarStyle = (status: Task["status"]): React.CSSProperties => ({
   position: "absolute",
   top: 0,
   left: 0,
   right: 0,
   height: 3,
-  background: color,
+  background: statusBorder(status),
 });
 
-const leftBarStyle = (color: string): React.CSSProperties => ({
+const leftBarStyle = (status: Task["status"]): React.CSSProperties => ({
   position: "absolute",
   top: 0,
   bottom: 0,
   left: 0,
   width: 3,
-  background: color,
+  background: statusBorder(status),
 });
 
 const cardTopRowStyle: React.CSSProperties = {
@@ -241,23 +207,17 @@ const channelNameStyle: React.CSSProperties = {
   letterSpacing: "0.03em",
 };
 
-const statusPillStyle = (status: string): React.CSSProperties => ({
+const statusPillStyle = (status: Task["status"]): React.CSSProperties => ({
   fontSize: 10,
   fontWeight: 600,
   letterSpacing: "0.03em",
   padding: "2px var(--space-2)",
   borderRadius: "20px",
-  background: statusPillBg[status] || statusPillBg.todo,
-  color: statusPillText[status] || statusPillText.todo,
+  background: statusPillBg(status),
+  color: statusPillText(status),
   flexShrink: 0,
   whiteSpace: "nowrap",
 });
-
-const estStyle: React.CSSProperties = {
-  fontSize: 11,
-  color: "var(--neutral-400)",
-  flexShrink: 0,
-};
 
 const intentTagStyle = (tag: string): React.CSSProperties => ({
   display: "inline-block",
@@ -271,12 +231,12 @@ const intentTagStyle = (tag: string): React.CSSProperties => ({
   color: intentTagColors[tag] || "var(--neutral-600)",
 });
 
-const taskTitleStyle = (status: string): React.CSSProperties => ({
+const taskTitleStyle = (status: Task["status"]): React.CSSProperties => ({
   fontSize: 14,
   fontWeight: 500,
-  color: status === "in_progress" ? "var(--accent-700)" : "var(--neutral-900)",
+  color: statusText(status),
   lineHeight: 1.4,
-  textDecoration: status === "done" ? "line-through" : "none",
+  textDecoration: statusStrike(status),
 });
 
 const dueStyle: React.CSSProperties = {

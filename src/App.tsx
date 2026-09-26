@@ -241,6 +241,49 @@ export default function App() {
     );
   };
 
+  const handleTaskDelete = async (taskId: string) => {
+    const { error } = await supabase
+      .from("tasks")
+      .delete()
+      .eq("id", taskId);
+
+    if (error) {
+      console.error("Failed to delete task:", error.message);
+      return;
+    }
+
+    setTasksByCampaign((prev) => {
+      const next: Record<string, Task[]> = {};
+      for (const [cid, tasks] of Object.entries(prev)) {
+        next[cid] = tasks.filter((t) => t.id !== taskId);
+      }
+      return next;
+    });
+
+    setSelectedTask(null);
+  };
+
+  const handleTaskCreate = async (taskData: Omit<Task, "id" | "created_at">): Promise<Task | null> => {
+    const { data, error } = await supabase
+      .from("tasks")
+      .insert(taskData)
+      .select()
+      .single();
+
+    if (error) {
+      console.error("Failed to create task:", error.message);
+      return null;
+    }
+
+    const created = data as Task;
+    setTasksByCampaign((prev) => {
+      const existing = prev[created.campaign_id] || [];
+      return { ...prev, [created.campaign_id]: [...existing, created] };
+    });
+
+    return created;
+  };
+
   if (loading) {
     return (
       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", background: "var(--bg-page)" }}>
@@ -320,6 +363,9 @@ export default function App() {
           onLoadDemo={handleLoadDemo}
           onTaskClick={setSelectedTask}
           tasksByCampaign={tasksByCampaign}
+          onTaskUpdate={handleTaskUpdate}
+          onTaskDelete={handleTaskDelete}
+          onTaskCreate={handleTaskCreate}
         />
       ) : activeCampaign ? (
         <CampaignView
@@ -337,6 +383,9 @@ export default function App() {
           onLoadDemo={handleLoadDemo}
           onTaskClick={setSelectedTask}
           tasksByCampaign={tasksByCampaign}
+          onTaskUpdate={handleTaskUpdate}
+          onTaskDelete={handleTaskDelete}
+          onTaskCreate={handleTaskCreate}
         />
       )}
 

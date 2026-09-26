@@ -3,13 +3,13 @@ interface Props {
 }
 
 export function Logo({ size = "compact" }: Props) {
-  const height = size === "large" ? 110 : 76;
-  const topPad = 0.078;
-  const bottomPad = 0.456;
+  const height = size === "large" ? 100 : 68;
+  const topPad = 0.024;
+  const bottomPad = 0.445;
 
   return (
     <img
-      src="/PlanShift_Logo.png"
+      src="/PlanShift-MVP.png"
       alt="PlanShift"
       style={{
         display: "block",

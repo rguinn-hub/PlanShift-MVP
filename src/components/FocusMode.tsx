@@ -1,8 +1,15 @@
-import { useState, useMemo, useRef } from "react";
-import { Play, ChevronRight, Clock, Archive, CircleDot, HelpCircle, X, Check } from "lucide-react";
-import type { Task, MicroStep, UrgencyLevel } from "../lib/types";
-import { getUrgencyLevel, urgencyColors, getFirstUnfinishedStep } from "../lib/types";
+import { useState, useMemo, useRef, useEffect } from "react";
+import { Play, ChevronRight, Clock, Archive, CircleDot, HelpCircle, X, Check, CheckCircle2 } from "lucide-react";
+import type { Task } from "../lib/types";
+import { getUrgencyLevel, getFirstUnfinishedStep } from "../lib/types";
 import { channelIcons, channelColors, intentTagColors, intentTagBg } from "../lib/channels";
+import {
+  statusLabel,
+  statusBg,
+  statusBorder,
+  statusText,
+  statusStrike,
+} from "../lib/statusStyles";
 import type { LucideIcon } from "lucide-react";
 
 interface Props {
@@ -12,22 +19,75 @@ interface Props {
 }
 
 export default function FocusMode({ tasks, onTaskClick, onTaskUpdate }: Props) {
-  const [started, setStarted] = useState(false);
   const [showStuck, setShowStuck] = useState(false);
+  const [doneExpanded, setDoneExpanded] = useState(true);
+  const [showConfetti, setShowConfetti] = useState(false);
+  const confettiTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const completedRef = useRef<Set<string>>(new Set());
 
-  const { doFirst, startNow, comingUp, laterCount, parkedCount } = useMemo(() => {
+  useEffect(() => {
+    return () => {
+      if (confettiTimeoutRef.current) clearTimeout(confettiTimeoutRef.current);
+    };
+  }, []);
+
+  const { doFirst, startNow, comingUp, laterCount, doneCount, doneTasks } = useMemo(() => {
     const unfinished = tasks
       .filter((t) => t.status !== "done")
+      .sort((a, b) => a.sort_order - b.sort_order);
+
+    const doneTasks = tasks
+      .filter((t) => t.status === "done")
       .sort((a, b) => a.sort_order - b.sort_order);
 
     const doFirst = unfinished[0] || null;
     const startNow = unfinished.slice(1, 3);
     const comingUp = unfinished.slice(3, 6);
     const laterCount = Math.max(0, unfinished.length - 6);
-    const parkedCount = tasks.filter((t) => t.status === "done").length;
+    const doneCount = doneTasks.length;
 
-    return { doFirst, startNow, comingUp, laterCount, parkedCount };
+    return { doFirst, startNow, comingUp, laterCount, doneCount, doneTasks };
   }, [tasks]);
+
+  const handleComplete = (task: Task) => {
+    if (completedRef.current.has(task.id)) return;
+    completedRef.current.add(task.id);
+    onTaskUpdate(task.id, { status: "done" });
+
+    const prefersReduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (!prefersReduced) {
+      setShowConfetti(true);
+      if (confettiTimeoutRef.current) clearTimeout(confettiTimeoutRef.current);
+      confettiTimeoutRef.current = setTimeout(() => setShowConfetti(false), 2000);
+    }
+  };
+
+  const handleStart = () => {
+    if (doFirst) {
+      if (doFirst.status === "todo") {
+        onTaskUpdate(doFirst.id, { status: "in_progress" });
+      }
+      onTaskClick(doFirst);
+    }
+  };
+
+  const handleStepDone = () => {
+    if (!doFirst?.micro_steps) return;
+    const updatedSteps = doFirst.micro_steps.map((s, i) =>
+      i === doFirst.micro_steps!.findIndex((ms) => !ms.done) ? { ...s, done: true } : s
+    );
+    onTaskUpdate(doFirst.id, { micro_steps: updatedSteps });
+  };
+
+  const isDueOrOverdue = (task: Task): boolean => {
+    if (task.status === "done") return false;
+    const due = new Date(task.due_date + "T00:00:00");
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return due <= today;
+  };
+
+  const heroIsMelon = doFirst ? isDueOrOverdue(doFirst) : false;
 
   if (!doFirst) {
     return (
@@ -41,51 +101,74 @@ export default function FocusMode({ tasks, onTaskClick, onTaskUpdate }: Props) {
         <p style={{ color: "var(--neutral-500)", fontSize: 15, maxWidth: 360, textAlign: "center" }}>
           Every task is done. Your campaign is complete.
         </p>
+        {doneCount > 0 && (
+          <div style={{ marginTop: "var(--space-6)", width: "100%", maxWidth: 480 }}>
+            <DoneSection
+              doneTasks={doneTasks}
+              doneExpanded={doneExpanded}
+              setDoneExpanded={setDoneExpanded}
+              onTaskClick={onTaskClick}
+              onTaskUpdate={onTaskUpdate}
+            />
+          </div>
+        )}
       </div>
     );
   }
 
   const heroUrgency = getUrgencyLevel(doFirst);
-  const heroUrgencyColor = urgencyColors[heroUrgency];
   const firstStep = getFirstUnfinishedStep(doFirst);
   const microStepText = firstStep
     ? firstStep.text
     : extractMicroStep(doFirst);
   const Icon: LucideIcon = channelIcons[doFirst.channel] || channelIcons["Website"];
 
-  const handleStart = () => {
-    if (!started) {
-      setStarted(true);
-      onTaskUpdate(doFirst.id, { status: "in_progress" });
-    } else {
-      onTaskClick(doFirst);
-    }
-  };
-
-  const handleStepDone = () => {
-    if (!doFirst.micro_steps) return;
-    const updatedSteps = doFirst.micro_steps.map((s, i) =>
-      i === doFirst.micro_steps!.findIndex((ms) => !ms.done) ? { ...s, done: true } : s
-    );
-    onTaskUpdate(doFirst.id, { micro_steps: updatedSteps });
-  };
+  const heroCardFinalStyle: React.CSSProperties = heroIsMelon
+    ? { ...heroCardStyle, borderLeft: `4px solid var(--melon-border)`, background: "var(--melon-bg)" }
+    : { ...heroCardStyle, borderLeft: `4px solid ${urgencyColors[heroUrgency].border}` };
 
   return (
     <div style={containerStyle}>
+      {showConfetti && <Confetti />}
+
+      {/* Done section (expanded to left on desktop) */}
+      {doneCount > 0 && doneExpanded && (
+        <div style={{ width: "100%" }}>
+          <DoneSection
+            doneTasks={doneTasks}
+            doneExpanded={doneExpanded}
+            setDoneExpanded={setDoneExpanded}
+            onTaskClick={onTaskClick}
+            onTaskUpdate={onTaskUpdate}
+          />
+        </div>
+      )}
+
+      {/* Done count toggle (always visible) */}
+      {doneCount > 0 && (
+        <button
+          className="btn btn-secondary"
+          style={{ alignSelf: "flex-start", fontSize: 14 }}
+          onClick={() => setDoneExpanded((v) => !v)}
+        >
+          <CheckCircle2 size={16} />
+          Done ({doneCount})
+          {doneExpanded ? <ChevronRight size={14} style={{ transform: "rotate(90deg)" }} /> : <ChevronRight size={14} />}
+        </button>
+      )}
+
       {/* Do this first */}
       <div
-        className={heroUrgency === "orange" ? "urgency-pulse" : undefined}
-        style={{
-          ...heroCardStyle,
-          borderLeft: `4px solid ${heroUrgencyColor.border}`,
-          background: heroUrgency === "red" ? "var(--urgency-red-bg)" : "var(--neutral-0)",
-        }}
+        className={heroIsMelon ? "urgency-pulse" : undefined}
+        style={heroCardFinalStyle}
       >
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <p style={{ ...heroLabelStyle, color: heroUrgencyColor.border }}>
-            {heroUrgencyColor.label}
+          <p style={{ ...heroLabelStyle, color: heroIsMelon ? "var(--melon-text)" : urgencyColors[heroUrgency].border }}>
+            {heroIsMelon ? "Due now" : urgencyColors[heroUrgency].label}
           </p>
-          <div style={{ ...urgencyDotStyle, background: heroUrgencyColor.dot }} />
+          <span style={heroStatusPillStyle(doFirst.status)}>
+            {statusLabel[doFirst.status]}
+          </span>
         </div>
         <div style={heroIconRow}>
           <div style={{ ...heroDotStyle, background: channelColors[doFirst.channel] || "var(--neutral-400)" }}>
@@ -126,7 +209,7 @@ export default function FocusMode({ tasks, onTaskClick, onTaskUpdate }: Props) {
         <div style={{ display: "flex", gap: "var(--space-3)" }}>
           <button className="btn btn-primary btn-large" style={{ ...startBtnStyle, flex: 1 }} onClick={handleStart}>
             <Play size={18} />
-            {started ? "Open task" : "Start"}
+            {doFirst.status === "in_progress" ? "Open task" : "Start"}
           </button>
           <button
             className="btn btn-secondary btn-large"
@@ -135,6 +218,14 @@ export default function FocusMode({ tasks, onTaskClick, onTaskUpdate }: Props) {
           >
             <HelpCircle size={18} />
             I'm stuck
+          </button>
+          <button
+            className="btn btn-primary btn-large"
+            style={{ ...completeBtnStyle }}
+            onClick={() => handleComplete(doFirst)}
+          >
+            <Check size={18} />
+            Done
           </button>
         </div>
       </div>
@@ -163,25 +254,22 @@ export default function FocusMode({ tasks, onTaskClick, onTaskUpdate }: Props) {
         </div>
       )}
 
-      {/* Later + Parked counts */}
-      <div style={countsRowStyle}>
-        {laterCount > 0 && (
-          <div style={countItemStyle}>
+      {/* Later count */}
+      {laterCount > 0 && (
+        <div style={countsRowStyle}>
+          <button style={countClickableStyle} onClick={() => {
+            const laterTask = tasks
+          .filter((t) => t.status !== "done")
+          .sort((a, b) => a.sort_order - b.sort_order)[6];
+        if (laterTask) onTaskClick(laterTask);
+      }}>
             <div style={{ ...countDotStyle, background: "var(--urgency-green)" }} />
             <span style={countTextStyle}>
               <strong style={{ color: "var(--neutral-700)" }}>{laterCount}</strong> later
             </span>
-          </div>
-        )}
-        {parkedCount > 0 && (
-          <div style={countItemStyle}>
-            <Archive size={16} color="var(--neutral-400)" />
-            <span style={countTextStyle}>
-              <strong style={{ color: "var(--neutral-700)" }}>{parkedCount}</strong> parked
-            </span>
-          </div>
-        )}
-      </div>
+          </button>
+        </div>
+      )}
 
       {showStuck && (
         <StuckOverlay
@@ -193,6 +281,87 @@ export default function FocusMode({ tasks, onTaskClick, onTaskUpdate }: Props) {
     </div>
   );
 }
+
+/* ---------- Done Section ---------- */
+function DoneSection({ doneTasks, doneExpanded, setDoneExpanded, onTaskClick, onTaskUpdate }: {
+  doneTasks: Task[];
+  doneExpanded: boolean;
+  setDoneExpanded: (v: boolean) => void;
+  onTaskClick: (task: Task) => void;
+  onTaskUpdate: (taskId: string, updates: Partial<Task>) => void;
+}) {
+  if (!doneExpanded) return null;
+  return (
+    <div style={doneSectionStyle}>
+      <div style={doneHeaderStyle}>
+        <CheckCircle2 size={18} color="var(--neutral-500)" />
+        <span style={doneHeaderTextStyle}>Done ({doneTasks.length})</span>
+        <button className="btn btn-ghost" style={{ padding: "var(--space-1)", marginLeft: "auto" }} onClick={() => setDoneExpanded(false)}>
+          <ChevronRight size={16} style={{ transform: "rotate(90deg)" }} />
+        </button>
+      </div>
+      <div style={doneListStyle}>
+        {doneTasks.map((task) => {
+          const Icon: LucideIcon = channelIcons[task.channel] || channelIcons["Website"];
+          return (
+            <div key={task.id} style={doneCardStyle(task.status)}>
+              <button style={{ display: "flex", alignItems: "center", gap: "var(--space-3)", flex: 1, textAlign: "left", cursor: "pointer", border: "none", background: "none" }} onClick={() => onTaskClick(task)}>
+                <div style={{ ...rowDotStyle, background: channelColors[task.channel] || "var(--neutral-400)" }}>
+                  <Icon size={12} color="var(--neutral-0)" />
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={doneTitleStyle(task.status)}>{task.title}</div>
+                  <div style={rowMetaStyle}>
+                    {task.channel}
+                    {" · "}
+                    {new Date(task.due_date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                  </div>
+                </div>
+              </button>
+              <button
+                className="btn btn-ghost"
+                style={{ padding: "var(--space-1) var(--space-2)", fontSize: 13, color: "var(--accent-600)", fontWeight: 600, flexShrink: 0 }}
+                onClick={() => onTaskUpdate(task.id, { status: "todo" })}
+              >
+                Reopen
+              </button>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* ---------- Confetti ---------- */
+function Confetti() {
+  const colors = ["var(--accent-500)", "var(--urgency-orange)", "var(--urgency-yellow)", "var(--urgency-green)", "var(--status-todo-border)"];
+  const pieces = Array.from({ length: 24 }, (_, i) => ({
+    id: i,
+    left: Math.random() * 100,
+    delay: Math.random() * 0.3,
+    color: colors[i % colors.length],
+  }));
+  return (
+    <>
+      {pieces.map((p) => (
+        <div
+          key={p.id}
+          className="confetti-piece"
+          style={{ left: `${p.left}%`, top: "20%", background: p.color, animationDelay: `${p.delay}s` }}
+        />
+      ))}
+    </>
+  );
+}
+
+/* ---------- Urgency colors (kept for labels) ---------- */
+const urgencyColors: Record<string, { border: string; dot: string; label: string }> = {
+  red: { border: "#dc2626", dot: "#dc2626", label: "Do this first" },
+  orange: { border: "#ea580c", dot: "#ea580c", label: "Start now" },
+  yellow: { border: "#ca8a04", dot: "#ca8a04", label: "Coming up" },
+  green: { border: "#16a34a", dot: "#16a34a", label: "Later" },
+};
 
 function extractMicroStep(task: Task): string | null {
   if (!task.draft_copy) return null;
@@ -207,10 +376,17 @@ function FocusTaskRow({ task, onClick }: { task: Task; onClick: () => void }) {
   const Icon: LucideIcon = channelIcons[task.channel] || channelIcons["Website"];
   const urgency = getUrgencyLevel(task);
   const uc = urgencyColors[urgency];
+  const dueToday = (() => {
+    const due = new Date(task.due_date + "T00:00:00");
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return due <= today;
+  })();
+  const borderColor = dueToday ? "var(--melon-border)" : uc.border;
   return (
     <button
-      className={urgency === "orange" ? "urgency-pulse" : undefined}
-      style={{ ...rowStyle, borderLeft: `3px solid ${uc.border}` }}
+      className={dueToday ? "urgency-pulse" : undefined}
+      style={{ ...rowStyle, borderLeft: `3px solid ${borderColor}` }}
       onClick={onClick}
     >
       <div style={{ ...rowDotStyle, background: channelColors[task.channel] || "var(--neutral-400)" }}>
@@ -250,9 +426,11 @@ function StuckOverlay({ task, onClose, onUpdate }: {
   const [timerRunning, setTimerRunning] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const handlePickReason = (reasonId: string) => {
-    setReason(reasonId);
-  };
+  useEffect(() => {
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
+  }, []);
 
   const handleStartTimer = (minutes: number) => {
     setTimerDuration(minutes);
@@ -302,7 +480,7 @@ function StuckOverlay({ task, onClose, onUpdate }: {
                   <button
                     key={r.id}
                     style={reasonBtnStyle}
-                    onClick={() => handlePickReason(r.id)}
+                    onClick={() => setReason(r.id)}
                   >
                     {r.label}
                   </button>
@@ -405,15 +583,27 @@ function TimerDisplay({ seconds, totalSeconds, running }: { seconds: number; tot
   );
 }
 
-/* ---------- Styles ---------- */
+/* ---------- Status pill helper ---------- */
+function heroStatusPillStyle(status: Task["status"]): React.CSSProperties {
+  return {
+    fontSize: 11,
+    fontWeight: 600,
+    padding: "2px var(--space-2)",
+    borderRadius: "20px",
+    background: status === "todo" ? "var(--status-todo-pill-bg)" : status === "in_progress" ? "var(--status-progress-pill-bg)" : "var(--status-done-pill-bg)",
+    color: status === "todo" ? "var(--status-todo-pill-text)" : status === "in_progress" ? "var(--status-progress-pill-text)" : "var(--status-done-pill-text)",
+    whiteSpace: "nowrap",
+  };
+}
 
+/* ---------- Styles ---------- */
 const containerStyle: React.CSSProperties = {
   maxWidth: 560,
   margin: "0 auto",
   padding: "var(--space-8) var(--space-6) var(--space-12)",
   display: "flex",
   flexDirection: "column",
-  gap: "var(--space-8)",
+  gap: "var(--space-6)",
 };
 
 const heroCardStyle: React.CSSProperties = {
@@ -431,13 +621,6 @@ const heroLabelStyle: React.CSSProperties = {
   fontWeight: 600,
   textTransform: "uppercase",
   letterSpacing: "0.08em",
-};
-
-const urgencyDotStyle: React.CSSProperties = {
-  width: 10,
-  height: 10,
-  borderRadius: "50%",
-  flexShrink: 0,
 };
 
 const heroIconRow: React.CSSProperties = {
@@ -541,6 +724,11 @@ const stuckBtnStyle: React.CSSProperties = {
   flexShrink: 0,
 };
 
+const completeBtnStyle: React.CSSProperties = {
+  marginTop: "var(--space-2)",
+  flexShrink: 0,
+};
+
 const sectionStyle: React.CSSProperties = {
   display: "flex",
   flexDirection: "column",
@@ -603,10 +791,14 @@ const countsRowStyle: React.CSSProperties = {
   borderTop: "1px solid var(--neutral-200)",
 };
 
-const countItemStyle: React.CSSProperties = {
+const countClickableStyle: React.CSSProperties = {
   display: "flex",
   alignItems: "center",
   gap: "var(--space-2)",
+  border: "none",
+  background: "none",
+  cursor: "pointer",
+  padding: 0,
 };
 
 const countDotStyle: React.CSSProperties = {
@@ -619,6 +811,53 @@ const countTextStyle: React.CSSProperties = {
   fontSize: 14,
   color: "var(--neutral-400)",
 };
+
+// Done section
+const doneSectionStyle: React.CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  gap: "var(--space-2)",
+};
+
+const doneHeaderStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: "var(--space-2)",
+};
+
+const doneHeaderTextStyle: React.CSSProperties = {
+  fontSize: 15,
+  fontWeight: 600,
+  color: "var(--neutral-600)",
+};
+
+const doneListStyle: React.CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  gap: "var(--space-2)",
+  maxHeight: 200,
+  overflowY: "auto",
+};
+
+const doneCardStyle = (status: Task["status"]): React.CSSProperties => ({
+  display: "flex",
+  alignItems: "center",
+  gap: "var(--space-2)",
+  padding: "var(--space-3)",
+  borderRadius: "var(--radius-sm)",
+  background: statusBg(status),
+  border: `1px solid ${statusBorder(status)}`,
+});
+
+const doneTitleStyle = (status: Task["status"]): React.CSSProperties => ({
+  fontSize: 14,
+  fontWeight: 500,
+  color: statusText(status),
+  textDecoration: statusStrike(status),
+  whiteSpace: "nowrap",
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+});
 
 const emptyContainerStyle: React.CSSProperties = {
   minHeight: "60vh",

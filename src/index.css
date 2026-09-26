@@ -13,10 +13,29 @@
   --accent-800: #006b60;
   --accent-900: #00574f;
 
-  /* To-do card accent (lavender in dark mode) */
-  --todo-accent: var(--neutral-300);
-  --todo-bg: var(--neutral-100);
-  --todo-text: var(--neutral-500);
+  /* Task status colors — LIGHT MODE */
+  --status-todo-bg: #f3edfe;
+  --status-todo-border: #8b5cf6;
+  --status-todo-text: #1e1b2e;
+  --status-todo-pill-bg: #ede9fe;
+  --status-todo-pill-text: #6d28d9;
+
+  --status-progress-bg: #dcfce7;
+  --status-progress-border: #15803d;
+  --status-progress-text: #14532d;
+  --status-progress-pill-bg: #dcfce7;
+  --status-progress-pill-text: #166534;
+
+  --status-done-bg: #e0e7ef;
+  --status-done-border: #1e3a5f;
+  --status-done-text: #1e3a5f;
+  --status-done-pill-bg: #e0e7ef;
+  --status-done-pill-text: #1e3a5f;
+
+  /* Melon urgency highlight for Focus */
+  --melon-bg: #fce3dc;
+  --melon-border: #f4b8a6;
+  --melon-text: #5c2a1a;
 
   /* PlanShift navy neutral ramp */
   --neutral-0: #ffffff;
@@ -237,6 +256,20 @@ label {
   to { stroke-dashoffset: 283; }
 }
 
+@keyframes confetti-fall {
+  0% { transform: translateY(-20px) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(400px) rotate(360deg); opacity: 0; }
+}
+
+.confetti-piece {
+  position: fixed;
+  width: 8px;
+  height: 8px;
+  pointer-events: none;
+  animation: confetti-fall 1.5s ease-out forwards;
+  z-index: 300;
+}
+
 .dark {
   --bg-page: #0d1b33;
   --neutral-0: #1a1a1a;
@@ -263,9 +296,28 @@ label {
   --urgency-yellow-bg: #3a3618;
   --urgency-green-bg: #1a3a28;
 
-  --todo-accent: #a78bfa;
-  --todo-bg: #1e1b4b;
-  --todo-text: #c4b5fd;
+  /* Task status colors — DARK MODE */
+  --status-todo-bg: #2d1f5e;
+  --status-todo-border: #a78bfa;
+  --status-todo-text: #e9e0ff;
+  --status-todo-pill-bg: #3a2a6e;
+  --status-todo-pill-text: #c4b5fd;
+
+  --status-progress-bg: #14532d;
+  --status-progress-border: #22c55e;
+  --status-progress-text: #dcfce7;
+  --status-progress-pill-bg: #1a3a28;
+  --status-progress-pill-text: #86efac;
+
+  --status-done-bg: #1a1a1a;
+  --status-done-border: #e5e7eb;
+  --status-done-text: #f3f4f6;
+  --status-done-pill-bg: #2e2e2e;
+  --status-done-pill-text: #e5e7eb;
+
+  --melon-bg: #3a2418;
+  --melon-border: #f4b8a6;
+  --melon-text: #fce3dc;
 }
 
 @media (prefers-reduced-motion: reduce) {
