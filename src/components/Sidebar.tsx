@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, X, FolderOpen, Trash2, AlertTriangle } from "lucide-react";
+import { Plus, X, FolderOpen, Trash2, AlertTriangle, Home as HomeIcon } from "lucide-react";
 import type { Campaign } from "../lib/types";
 import { Logo } from "./Logo";
 
@@ -8,6 +8,7 @@ interface Props {
   activeCampaignId: string | null;
   onSelect: (campaign: Campaign) => void;
   onNewCampaign: () => void;
+  onHome: () => void;
   onDeleteCampaign: (campaign: Campaign) => Promise<void>;
   onClose: () => void;
 }
@@ -17,6 +18,7 @@ export default function Sidebar({
   activeCampaignId,
   onSelect,
   onNewCampaign,
+  onHome,
   onDeleteCampaign,
   onClose,
 }: Props) {
@@ -48,6 +50,11 @@ export default function Sidebar({
         </div>
 
         <div style={sidebarBodyStyle}>
+          <button className="btn btn-secondary" style={newCampaignBtnStyle} onClick={onHome}>
+            <HomeIcon size={18} />
+            Home
+          </button>
+
           <button className="btn btn-primary" style={newCampaignBtnStyle} onClick={onNewCampaign}>
             <Plus size={18} />
             New Campaign

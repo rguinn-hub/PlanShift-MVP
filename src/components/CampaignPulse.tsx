@@ -33,7 +33,7 @@ export default function CampaignPulse({ campaign, tasks }: Props) {
     },
     {
       icon: Radio,
-      label: "Active channels",
+      label: "Selected channels",
       value: String(activeChannels),
     },
     {

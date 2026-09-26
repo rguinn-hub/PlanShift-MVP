@@ -3,16 +3,21 @@ interface Props {
 }
 
 export function Logo({ size = "compact" }: Props) {
+  const height = size === "large" ? 110 : 76;
+  const topPad = 0.078;
+  const bottomPad = 0.456;
+
   return (
     <img
       src="/PlanShift_Logo.png"
       alt="PlanShift"
-      className={size === "large" ? "h-16 w-auto object-contain" : "h-12 w-auto object-contain"}
       style={{
         display: "block",
-        height: size === "large" ? 80 : 64,
+        height,
         width: "auto",
         objectFit: "contain",
+        marginTop: -(height * topPad),
+        marginBottom: -(height * bottomPad),
       }}
     />
   );

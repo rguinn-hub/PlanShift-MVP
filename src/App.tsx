@@ -1,24 +1,31 @@
 import { useEffect, useState, useCallback } from "react";
 import type { Session } from "@supabase/supabase-js";
-import { Menu, Sun, Moon } from "lucide-react";
+import { Menu, Sun, Moon, Home as HomeIcon } from "lucide-react";
 import { supabase } from "./lib/supabase";
 import AuthScreen from "./screens/AuthScreen";
 import NewCampaign from "./screens/NewCampaign";
 import CampaignView from "./screens/CampaignView";
+import HomeDashboard from "./screens/HomeDashboard";
 import Sidebar from "./components/Sidebar";
-import type { Campaign } from "./lib/types";
+import TaskDetail from "./components/TaskDetail";
+import type { Campaign, Task } from "./lib/types";
 import { Logo } from "./components/Logo";
+import { DEMO_CAMPAIGN, buildDemoTasks } from "./lib/demoData";
+
+type Screen = "home" | "campaign" | "newCampaign";
 
 export default function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [activeCampaign, setActiveCampaign] = useState<Campaign | null>(null);
-  const [showNewCampaign, setShowNewCampaign] = useState(false);
+  const [screen, setScreen] = useState<Screen>("home");
   const [view, setView] = useState<"standard" | "focus">("standard");
   const [demoMode, setDemoMode] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
+  const [tasksByCampaign, setTasksByCampaign] = useState<Record<string, Task[]>>({});
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
 
   useEffect(() => {
     const saved = localStorage.getItem("planshift-theme");
@@ -48,7 +55,7 @@ export default function App() {
       if (!sess && !demoMode) {
         setCampaigns([]);
         setActiveCampaign(null);
-        setShowNewCampaign(false);
+        setScreen("home");
       }
     });
 
@@ -72,23 +79,47 @@ export default function App() {
       return;
     }
 
-    const list = (data as Campaign[]) || [];
-    setCampaigns(list);
-
-    if (list.length > 0 && !activeCampaign && !showNewCampaign) {
-      setActiveCampaign(list[0]);
-    }
-
-    if (list.length === 0) {
-      setShowNewCampaign(true);
-    }
-  }, [session, activeCampaign, showNewCampaign]);
+    setCampaigns((data as Campaign[]) || []);
+  }, [session]);
 
   useEffect(() => {
     if (session || demoMode) {
       loadCampaigns();
     }
   }, [session, demoMode, loadCampaigns]);
+
+  // Load all tasks for the user's campaigns (for dashboard)
+  const loadAllTasks = useCallback(async () => {
+    if (campaigns.length === 0) {
+      setTasksByCampaign({});
+      return;
+    }
+    const campaignIds = campaigns.map((c) => c.id);
+    const { data, error } = await supabase
+      .from("tasks")
+      .select("*")
+      .in("campaign_id", campaignIds)
+      .order("sort_order", { ascending: true });
+
+    if (error) {
+      console.error("Failed to load tasks:", error.message);
+      return;
+    }
+
+    const taskList = (data as Task[]) || [];
+    const byCampaign: Record<string, Task[]> = {};
+    for (const t of taskList) {
+      if (!byCampaign[t.campaign_id]) byCampaign[t.campaign_id] = [];
+      byCampaign[t.campaign_id].push(t);
+    }
+    setTasksByCampaign(byCampaign);
+  }, [campaigns]);
+
+  useEffect(() => {
+    if (screen === "home") {
+      loadAllTasks();
+    }
+  }, [screen, loadAllTasks]);
 
   const handleSignOut = async () => {
     setDemoMode(false);
@@ -98,7 +129,7 @@ export default function App() {
   const handleCampaignCreated = (c: Campaign) => {
     setCampaigns((prev) => [c, ...prev]);
     setActiveCampaign(c);
-    setShowNewCampaign(false);
+    setScreen("campaign");
   };
 
   const handleCampaignUpdated = (updatedCampaign: Campaign) => {
@@ -112,8 +143,13 @@ export default function App() {
 
   const handleSelectCampaign = (c: Campaign) => {
     setActiveCampaign(c);
-    setShowNewCampaign(false);
+    setScreen("campaign");
     setSidebarOpen(false);
+  };
+
+  const handleOpenCampaign = (c: Campaign) => {
+    setActiveCampaign(c);
+    setScreen("campaign");
   };
 
   const handleDeleteCampaign = async (campaign: Campaign) => {
@@ -132,103 +168,177 @@ export default function App() {
     setCampaigns((prev) => prev.filter((c) => c.id !== campaign.id));
     if (wasActive) {
       setActiveCampaign(null);
-      setShowNewCampaign(true);
+      setScreen("home");
     }
   };
 
   const handleNewCampaign = () => {
-    setShowNewCampaign(true);
+    setScreen("newCampaign");
     setActiveCampaign(null);
     setSidebarOpen(false);
   };
 
+  const handleGoHome = () => {
+    setScreen("home");
+    setActiveCampaign(null);
+    setSidebarOpen(false);
+  };
+
+  const handleLoadDemo = async () => {
+    try {
+      const { data, error: insertError } = await supabase
+        .from("campaigns")
+        .insert({
+          business_name: DEMO_CAMPAIGN.business_name,
+          business_brief: DEMO_CAMPAIGN.business_brief,
+          target_audience: DEMO_CAMPAIGN.target_audience,
+          goal: DEMO_CAMPAIGN.goal,
+          channels: DEMO_CAMPAIGN.channels,
+          start_date: DEMO_CAMPAIGN.start_date,
+          duration_days: DEMO_CAMPAIGN.duration_days,
+        })
+        .select()
+        .single();
+
+      if (insertError) throw insertError;
+
+      const campaign = data as Campaign;
+      const tasks = buildDemoTasks(campaign.id);
+
+      const { error: taskError } = await supabase
+        .from("tasks")
+        .insert(tasks);
+
+      if (taskError) throw taskError;
+
+      handleCampaignCreated(campaign);
+    } catch (err) {
+      console.error("Failed to load demo:", err instanceof Error ? err.message : "Unknown error");
+    }
+  };
+
+  const handleTaskUpdate = async (taskId: string, updates: Partial<Task>) => {
+    const { error } = await supabase
+      .from("tasks")
+      .update(updates)
+      .eq("id", taskId);
+
+    if (error) {
+      console.error("Failed to update task:", error.message);
+      return;
+    }
+
+    setTasksByCampaign((prev) => {
+      const next: Record<string, Task[]> = {};
+      for (const [cid, tasks] of Object.entries(prev)) {
+        next[cid] = tasks.map((t) => (t.id === taskId ? { ...t, ...updates } : t));
+      }
+      return next;
+    });
+
+    setSelectedTask((prev) =>
+      prev && prev.id === taskId ? { ...prev, ...updates } : prev
+    );
+  };
+
   if (loading) {
     return (
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", background: "var(--bg-page)" }}>
         <p style={{ color: "var(--neutral-400)", fontSize: 16 }}>Loading...</p>
       </div>
     );
   }
 
   if (!session && !demoMode) {
-    return <AuthScreen onSkipLogin={() => { setDemoMode(true); setShowNewCampaign(true); }} />;
+    return <AuthScreen onSkipLogin={() => { setDemoMode(true); setScreen("home"); }} />;
   }
 
-  if (showNewCampaign || campaigns.length === 0) {
-    return (
-      <div>
+  const showHeader = screen !== "newCampaign" || campaigns.length > 0;
+
+  return (
+    <div style={{ minHeight: "100vh", background: "var(--bg-page)" }}>
+      {showHeader && (
         <header style={headerStyle}>
-          {campaigns.length > 0 && (
-            <button className="btn btn-ghost" onClick={() => setSidebarOpen(true)} style={{ padding: "var(--space-2)" }}>
-              <Menu size={20} />
-            </button>
-          )}
-          <Logo />
+          <button className="btn btn-ghost" onClick={() => setSidebarOpen(true)} style={{ padding: "var(--space-2)" }} aria-label="Open menu">
+            <Menu size={20} />
+          </button>
+          <button onClick={handleGoHome} style={{ border: "none", background: "none", padding: 0, cursor: "pointer", display: "flex", alignItems: "center" }} aria-label="Go to Home">
+            <Logo />
+          </button>
           <div style={{ flex: 1 }} />
+          <button
+            className="btn btn-ghost"
+            onClick={handleGoHome}
+            style={{
+              padding: "var(--space-2) var(--space-3)",
+              fontWeight: screen === "home" ? 600 : 400,
+              color: screen === "home" ? "var(--accent-700)" : "var(--neutral-600)",
+            }}
+          >
+            <HomeIcon size={18} />
+            Home
+          </button>
           <button className="btn btn-ghost" onClick={toggleDarkMode} style={{ padding: "var(--space-2)" }} aria-label="Toggle dark mode">
             {darkMode ? <Sun size={18} /> : <Moon size={18} />}
           </button>
+          {screen === "campaign" && activeCampaign && (
+            <div style={toggleStyle}>
+              <button
+                className="btn"
+                style={view === "standard" ? toggleBtnActive : toggleBtn}
+                onClick={() => setView("standard")}
+              >
+                Standard
+              </button>
+              <button
+                className="btn"
+                style={view === "focus" ? toggleBtnActive : toggleBtn}
+                onClick={() => setView("focus")}
+              >
+                Focus
+              </button>
+            </div>
+          )}
           <button className="btn btn-ghost" onClick={handleSignOut}>
             {demoMode ? "Exit demo" : "Sign out"}
           </button>
         </header>
+      )}
+
+      {screen === "newCampaign" || (campaigns.length === 0 && screen !== "home") ? (
         <NewCampaign
           userId={session?.user.id || "demo-user"}
           onCreated={handleCampaignCreated}
           demoMode={demoMode}
         />
-        {sidebarOpen && campaigns.length > 0 && (
-          <Sidebar
-            campaigns={campaigns}
-            activeCampaignId={null}
-            onSelect={handleSelectCampaign}
-            onNewCampaign={handleNewCampaign}
-            onDeleteCampaign={handleDeleteCampaign}
-            onClose={() => setSidebarOpen(false)}
-          />
-        )}
-      </div>
-    );
-  }
-
-  return (
-    <div>
-      <header style={headerStyle}>
-        <button className="btn btn-ghost" onClick={() => setSidebarOpen(true)} style={{ padding: "var(--space-2)" }}>
-          <Menu size={20} />
-        </button>
-        <Logo />
-        <div style={{ display: "flex", alignItems: "center", gap: "var(--space-4)", marginLeft: "auto" }}>
-          <button className="btn btn-ghost" onClick={toggleDarkMode} style={{ padding: "var(--space-2)" }} aria-label="Toggle dark mode">
-            {darkMode ? <Sun size={18} /> : <Moon size={18} />}
-          </button>
-          <div style={toggleStyle}>
-            <button
-              className="btn"
-              style={view === "standard" ? toggleBtnActive : toggleBtn}
-              onClick={() => setView("standard")}
-            >
-              Standard
-            </button>
-            <button
-              className="btn"
-              style={view === "focus" ? toggleBtnActive : toggleBtn}
-              onClick={() => setView("focus")}
-            >
-              Focus
-            </button>
-          </div>
-          <button className="btn btn-ghost" onClick={handleSignOut}>
-            {demoMode ? "Exit demo" : "Sign out"}
-          </button>
-        </div>
-      </header>
-      <CampaignView
-        campaign={activeCampaign!}
-        mode={view}
-        demoMode={demoMode}
-        onCampaignUpdated={handleCampaignUpdated}
-      />
+      ) : screen === "home" ? (
+        <HomeDashboard
+          userId={session?.user.id || "demo-user"}
+          campaigns={campaigns}
+          onOpenCampaign={handleOpenCampaign}
+          onCreateCampaign={handleNewCampaign}
+          onLoadDemo={handleLoadDemo}
+          onTaskClick={setSelectedTask}
+          tasksByCampaign={tasksByCampaign}
+        />
+      ) : activeCampaign ? (
+        <CampaignView
+          campaign={activeCampaign}
+          mode={view}
+          demoMode={demoMode}
+          onCampaignUpdated={handleCampaignUpdated}
+        />
+      ) : (
+        <HomeDashboard
+          userId={session?.user.id || "demo-user"}
+          campaigns={campaigns}
+          onOpenCampaign={handleOpenCampaign}
+          onCreateCampaign={handleNewCampaign}
+          onLoadDemo={handleLoadDemo}
+          onTaskClick={setSelectedTask}
+          tasksByCampaign={tasksByCampaign}
+        />
+      )}
 
       {sidebarOpen && (
         <Sidebar
@@ -236,11 +346,30 @@ export default function App() {
           activeCampaignId={activeCampaign?.id || null}
           onSelect={handleSelectCampaign}
           onNewCampaign={handleNewCampaign}
+          onHome={handleGoHome}
           onDeleteCampaign={handleDeleteCampaign}
           onClose={() => setSidebarOpen(false)}
         />
       )}
+
+      {selectedTask && screen === "home" && (
+        <TaskDetailModal
+          task={selectedTask}
+          onClose={() => setSelectedTask(null)}
+          onUpdate={handleTaskUpdate}
+        />
+      )}
     </div>
+  );
+}
+
+function TaskDetailModal({ task, onClose, onUpdate }: {
+  task: Task;
+  onClose: () => void;
+  onUpdate: (taskId: string, updates: Partial<Task>) => void;
+}) {
+  return (
+    <TaskDetail task={task} onClose={onClose} onUpdate={onUpdate} />
   );
 }
 

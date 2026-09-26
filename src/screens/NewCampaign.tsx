@@ -198,7 +198,7 @@ export default function NewCampaign({ userId, onCreated, demoMode }: Props) {
           </div>
 
           <div>
-            <label>Channels</label>
+            <label>Selected channels</label>
             <div style={channelGridStyle}>
               {CHANNELS.map((ch) => {
                 const Icon: LucideIcon = channelIcons[ch];
@@ -280,6 +280,7 @@ const containerStyle: React.CSSProperties = {
   padding: "var(--space-8) var(--space-6)",
   display: "flex",
   justifyContent: "center",
+  background: "var(--bg-page)",
 };
 
 const cardStyle: React.CSSProperties = {

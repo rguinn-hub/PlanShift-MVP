@@ -73,6 +73,8 @@
   --shadow-lg: 0 12px 32px rgba(13, 27, 51, 0.16);
 
   --font-body: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+
+  --bg-page: #F3F1EB;
 }
 
 * {
@@ -236,6 +238,7 @@ label {
 }
 
 .dark {
+  --bg-page: #0d1b33;
   --neutral-0: #1a1a1a;
   --neutral-50: #242424;
   --neutral-100: #2e2e2e;
@@ -273,5 +276,21 @@ label {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+}
+
+/* Dashboard responsive grid */
+@media (max-width: 1024px) {
+  .dashboard-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .dashboard-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .campaign-card-grid {
+    grid-template-columns: 1fr !important;
   }
 }

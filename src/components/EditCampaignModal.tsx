@@ -113,7 +113,7 @@ export default function EditCampaignModal({ campaign, onSaved, onClose }: Props)
           </div>
 
           <div>
-            <label>Channels</label>
+            <label>Selected channels</label>
             <div style={channelGridStyle}>
               {CHANNELS.map((channel) => {
                 const Icon: LucideIcon = channelIcons[channel];

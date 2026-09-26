@@ -149,7 +149,7 @@ const containerStyle: React.CSSProperties = {
   alignItems: "center",
   justifyContent: "center",
   padding: "var(--space-6)",
-  background: "var(--neutral-0)",
+  background: "var(--bg-page)",
   position: "relative",
 };
 
