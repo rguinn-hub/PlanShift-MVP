@@ -17,6 +17,16 @@ interface CampaignInput {
   durationDays: number;
 }
 
+interface AITask {
+  title: string;
+  channel: string;
+  day_offset: number;
+  est_minutes: number;
+  intent_tag: string;
+  campaign_phase: string | null;
+  draft_copy: string;
+}
+
 interface GeneratedTask {
   title: string;
   channel: string;
@@ -24,6 +34,7 @@ interface GeneratedTask {
   draft_copy: string;
   est_minutes: number;
   intent_tag: string;
+  campaign_phase: string | null;
   sort_order: number;
 }
 
@@ -115,7 +126,7 @@ function emailWelcomeDraft(input: CampaignInput): string {
     ``,
     `Hi there,`,
     ``,
-    `Thanks for joining us. Here's what to expect:`,
+    `Thanks for joining us. Here's what you expect:`,
     ``,
     `- [Describe what subscribers will receive — e.g. weekly tips, early access, exclusive offers]`,
     `- [Set expectations on frequency — e.g. one email per week]`,
@@ -278,7 +289,7 @@ const TEMPLATES: Record<string, TaskTemplate[]> = {
   ],
 };
 
-// ---------- Generator ----------
+// ---------- Template-based generator (fallback) ----------
 
 function generateTasks(input: CampaignInput): GeneratedTask[] {
   const tasks: GeneratedTask[] = [];
@@ -286,17 +297,14 @@ function generateTasks(input: CampaignInput): GeneratedTask[] {
   const channels = input.channels;
   const totalDays = input.durationDays;
 
-  // Target task count: scale from 12 (30 days) to 25 (30 days), proportionally for other durations.
   const targetCount = Math.round(Math.max(8, Math.min(25, (totalDays / 30) * 18)));
 
-  // Build the pool of available templates for the selected channels.
   let pool: TaskTemplate[] = [];
   for (const ch of channels) {
     const templates = TEMPLATES[ch] || [];
     pool.push(...templates);
   }
 
-  // Always start with kickoff and end with review.
   const kickoffChannel = channels[0] || "Website";
   const reviewChannel = channels[0] || "Website";
 
@@ -307,10 +315,10 @@ function generateTasks(input: CampaignInput): GeneratedTask[] {
     draft_copy: launchDraft(input),
     est_minutes: 30,
     intent_tag: "AWARENESS",
+    campaign_phase: null,
     sort_order: 0,
   });
 
-  // Fill the middle with content tasks, cycling through the pool.
   const middleCount = Math.max(0, targetCount - 2);
   const spacing = middleCount > 0 ? Math.max(1, Math.floor((totalDays - 1) / (middleCount + 1))) : 1;
 
@@ -328,11 +336,11 @@ function generateTasks(input: CampaignInput): GeneratedTask[] {
       draft_copy: tmpl.draft(input),
       est_minutes: tmpl.est_minutes,
       intent_tag: tmpl.intent_tag,
+      campaign_phase: null,
       sort_order: i + 1,
     });
   }
 
-  // Review task on the last day.
   tasks.push({
     title: `Campaign wrap-up: review results for ${input.businessName}`,
     channel: reviewChannel,
@@ -340,6 +348,7 @@ function generateTasks(input: CampaignInput): GeneratedTask[] {
     draft_copy: reviewDraft(input),
     est_minutes: 45,
     intent_tag: "RETENTION",
+    campaign_phase: null,
     sort_order: tasks.length,
   });
 
@@ -349,6 +358,118 @@ function generateTasks(input: CampaignInput): GeneratedTask[] {
 function dateStr(start: Date, dayOffset: number): string {
   const d = new Date(start.getTime() + dayOffset * 86400000);
   return d.toISOString().slice(0, 10);
+}
+
+// ---------- OpenAI generator ----------
+
+const VALID_CHANNELS = ["Instagram", "Facebook", "TikTok", "Email", "Website"];
+const VALID_INTENT_TAGS = ["AWARENESS", "ENGAGEMENT", "RETENTION", "CONVERSION"];
+const VALID_PHASES = ["Launch", "Grow", "Sustain"];
+
+function buildOpenAIPrompt(input: CampaignInput): string {
+  const targetCount = Math.round(Math.max(8, Math.min(25, (input.durationDays / 30) * 18)));
+  return [
+    `You are a marketing campaign planner. Generate a content calendar as a JSON array of task objects.`,
+    ``,
+    `CAMPAIGN DETAILS:`,
+    `- Business name: ${input.businessName}`,
+    `- Business brief: ${input.businessBrief}`,
+    `- Target audience: ${input.targetAudience}`,
+    `- Campaign goal: ${input.goal}`,
+    `- Channels (use ONLY these): ${input.channels.join(", ")}`,
+    `- Campaign start date: ${input.startDate}`,
+    `- Campaign duration: ${input.durationDays} days`,
+    ``,
+    `RULES:`,
+    `1. Generate between ${targetCount} and 25 tasks total.`,
+    `2. Only use these channel values: ${VALID_CHANNELS.join(", ")}. Every task's channel MUST be one of the selected channels: ${input.channels.join(", ")}.`,
+    `3. Each task must have: title, channel, day_offset (integer 0 to ${input.durationDays - 1}), est_minutes (honest estimate, 5-180), intent_tag (one of ${VALID_INTENT_TAGS.join(", ")}), campaign_phase (one of ${VALID_PHASES.join(", ")}, or null), draft_copy (string with ready-to-edit draft content).`,
+    `4. The first task should be a kickoff/setup task on day_offset 0.`,
+    `5. The last task should be a campaign review/wrap-up on day_offset ${input.durationDays - 1}.`,
+    `6. Spread tasks across the full duration. Don't cluster them all at the start.`,
+    `7. In draft_copy, use placeholders like [PRICE], [LINK], [DATE], [DISCOUNT] for facts the user must fill in. Do NOT invent specific prices, URLs, dates, or statistics.`,
+    `8. Do NOT make any health or medical claims.`,
+    `9. Keep draft_copy concise but actionable — 3-8 lines.`,
+    `10. Titles should be specific and descriptive (e.g. "Instagram Reel: behind-the-scenes at the kitchen" not just "Reel").`,
+    `11. Vary content types and intent tags across tasks.`,
+    ``,
+    `Return ONLY a JSON array of task objects. No markdown, no explanation, no code fence.`,
+  ].join("\n");
+}
+
+interface OpenAIResponse {
+  choices: { message: { content: string } }[];
+}
+
+async function generateTasksWithAI(input: CampaignInput): Promise<GeneratedTask[]> {
+  const apiKey = Deno.env.get("OPENAI_API_KEY");
+  if (!apiKey) throw new Error("OPENAI_API_KEY not set");
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 30000);
+
+  const prompt = buildOpenAIPrompt(input);
+
+  let resp: Response;
+  try {
+    resp = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: "gpt-4o-mini",
+        messages: [
+          { role: "system", content: "You are a marketing campaign planner that outputs valid JSON only." },
+          { role: "user", content: prompt },
+        ],
+        response_format: { type: "json_object" },
+        temperature: 0.7,
+        max_tokens: 4000,
+      }),
+      signal: controller.signal,
+    });
+  } catch (err) {
+    clearTimeout(timeout);
+    throw new Error(`OpenAI fetch failed: ${err.message}`);
+  }
+  clearTimeout(timeout);
+
+  if (!resp.ok) {
+    const errText = await resp.text();
+    throw new Error(`OpenAI API error ${resp.status}: ${errText}`);
+  }
+
+  const data: OpenAIResponse = await resp.json();
+  const content = data.choices?.[0]?.message?.content;
+  if (!content) throw new Error("OpenAI returned empty content");
+
+  const parsed = JSON.parse(content);
+  const aiTasks: AITask[] = Array.isArray(parsed) ? parsed : parsed.tasks || [];
+  if (!Array.isArray(aiTasks) || aiTasks.length === 0) {
+    throw new Error("OpenAI returned no tasks");
+  }
+
+  const start = new Date(input.startDate + "T00:00:00");
+  const validChannelSet = new Set(input.channels);
+
+  const tasks: GeneratedTask[] = aiTasks
+    .filter((t) => t && t.title && t.channel && validChannelSet.has(t.channel))
+    .map((t, i) => ({
+      title: String(t.title).slice(0, 200),
+      channel: t.channel,
+      due_date: dateStr(start, Math.max(0, Math.min(input.durationDays - 1, Math.round(t.day_offset || 0)))),
+      draft_copy: String(t.draft_copy || "").slice(0, 5000),
+      est_minutes: Math.max(5, Math.min(180, Math.round(t.est_minutes || 30))),
+      intent_tag: VALID_INTENT_TAGS.includes(t.intent_tag) ? t.intent_tag : "AWARENESS",
+      campaign_phase: t.campaign_phase && VALID_PHASES.includes(t.campaign_phase) ? t.campaign_phase : null,
+      sort_order: i,
+    }));
+
+  if (tasks.length === 0) throw new Error("OpenAI returned no valid tasks after filtering");
+
+  return tasks;
 }
 
 // ---------- Server ----------
@@ -380,7 +501,17 @@ Deno.serve(async (req: Request) => {
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, serviceKey);
 
-    const tasks = generateTasks(body);
+    let tasks: GeneratedTask[];
+    let usedAI = false;
+    let aiError: string | null = null;
+
+    try {
+      tasks = await generateTasksWithAI(body);
+      usedAI = true;
+    } catch (err) {
+      aiError = err.message;
+      tasks = generateTasks(body);
+    }
 
     const { error: insertError } = await supabase
       .from("tasks")
@@ -393,7 +524,7 @@ Deno.serve(async (req: Request) => {
           draft_copy: t.draft_copy,
           est_minutes: t.est_minutes,
           intent_tag: t.intent_tag,
-          campaign_phase: null,
+          campaign_phase: t.campaign_phase,
           status: "todo",
           sort_order: t.sort_order,
         }))
@@ -407,7 +538,7 @@ Deno.serve(async (req: Request) => {
     }
 
     return new Response(
-      JSON.stringify({ success: true, taskCount: tasks.length }),
+      JSON.stringify({ success: true, taskCount: tasks.length, source: usedAI ? "openai" : "template", ...(aiError ? { fallback_reason: aiError } : {}) }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (err) {
