@@ -39,98 +39,98 @@ export const DEMO_CAMPAIGN: Omit<Campaign, "id" | "user_id" | "created_at"> = {
 
 export const DEMO_TEMPLATES: DemoCampaignTemplate[] = [
   {
-    business_name: "FIBWEAR",
-    business_brief: "Premium activewear brand creating sustainable, high-performance workout apparel for serious athletes and fitness enthusiasts.",
-    target_audience: "Fitness enthusiasts aged 25-40 who value performance, sustainability, and premium quality in their workout gear",
-    goal: "Launch the new EcoFlex compression line and build a loyal community of brand advocates over 21 days",
+    business_name: "Fibwear Rescue Apparel",
+    business_brief: "A rescue-mission apparel brand selling dog-lover shirts (faith-inspired and sarcastic) and dog breed word-art designs, with part of every order supporting Georgia dog rescues.",
+    target_audience: "Dog lovers and rescue supporters, mostly women aged 30–60",
+    goal: "Launch the new store at fibwear.com and drive first sales over 21 days",
     channels: ["Instagram", "TikTok", "Email", "Website"],
     duration_days: 21,
     tasks: [
       {
-        title: "EcoFlex teaser post",
+        title: "Rescue dog spotlight post",
         channel: "Instagram",
         dayOffset: 0,
         est_minutes: 30,
         intent_tag: "AWARENESS",
         campaign_phase: "Prep",
-        draft_copy: "Performance meets sustainability. Something incredible is coming. #EcoFlex #FIBWEAR",
+        draft_copy: "Meet [DOG NAME]. [He/She] was rescued by [RESCUE NAME] and is now living [his/her] best life. Every shirt you buy from Fibwear helps dogs like [DOG NAME] find their forever home. Store launching soon at fibwear.com. #AdoptDontShop #Fibwear",
         micro_steps: [
-          { text: "Shoot product flat-lay with natural lighting", done: false },
-          { text: "Write caption with teaser hook", done: false },
+          { text: "Choose a rescue dog photo from your partner rescue", done: false },
+          { text: "Write caption with the dog's story", done: false },
           { text: "Schedule for 7am peak engagement", done: false },
         ],
       },
       {
-        title: "Behind the seams video",
+        title: "Behind the brand video",
         channel: "TikTok",
         dayOffset: 3,
         est_minutes: 45,
-        intent_tag: "TRUST",
+        intent_tag: "RETENTION",
         campaign_phase: "Prep",
-        draft_copy: "How EcoFlex is made — from recycled ocean plastic to premium compression. Watch the journey.",
+        draft_copy: "Why we started Fibwear — a simple idea: shirts for dog lovers that actually give back. Part of every order supports Georgia dog rescues. No fine print. Store launching soon at fibwear.com.",
       },
       {
-        title: "Athlete spotlight story",
+        title: "Rescue partner spotlight story",
         channel: "Instagram",
         dayOffset: 5,
         est_minutes: 25,
-        intent_tag: "TRUST",
+        intent_tag: "RETENTION",
         campaign_phase: "Build",
-        draft_copy: "Meet @coach_maya. She trains in EcoFlex every morning. Here's why she switched.",
+        draft_copy: "We partner with [RESCUE NAME] in [CITY, GA]. [Short description of what they do — e.g. pull dogs from high-kill shelters, foster, adopt]. Your purchases make this possible. fibwear.com coming soon.",
       },
       {
-        title: "Product detail carousel",
+        title: "Design preview carousel",
         channel: "Instagram",
         dayOffset: 7,
         est_minutes: 40,
         intent_tag: "AWARENESS",
         campaign_phase: "Build",
-        draft_copy: "Slide 1: Meet EcoFlex. Slide 2: 4-way stretch. Slide 3: Recycled fabric. Slide 4: Moisture-wicking. Slide 5: Shop now.",
+        draft_copy: "Slide 1: Faith-inspired design teaser. Slide 2: Sassy dog-humor design teaser. Slide 3: Breed word-art teaser. Slide 4: [BREED] word-art detail. Slide 5: Shop at fibwear.com when we launch.",
       },
       {
-        title: "Launch day announcement",
+        title: "fibwear.com launch announcement",
         channel: "Instagram",
         dayOffset: 10,
         est_minutes: 35,
         intent_tag: "CONVERSION",
         campaign_phase: "Launch",
-        draft_copy: "IT'S HERE. EcoFlex Compression is live. Shop before sizes sell out. #EcoFlexLaunch",
+        draft_copy: "WE'RE LIVE. fibwear.com is officially open. Dog-lover shirts, faith-inspired and sarcastic, plus breed word-art designs. Part of every order supports Georgia dog rescues. Shop now: [LINK] #FibwearLaunch",
       },
       {
-        title: "Launch email blast",
+        title: "fibwear.com launch email",
         channel: "Email",
         dayOffset: 10,
         est_minutes: 40,
         intent_tag: "CONVERSION",
         campaign_phase: "Launch",
-        draft_copy: "Subject: EcoFlex is LIVE. Your best workout starts now.\n\nShop the collection before it's gone. Free shipping on orders over $75.",
+        draft_copy: "Subject: Fibwear is LIVE.\n\nThe store is open at fibwear.com. Dog-lover shirts (faith-inspired and a little sarcastic), breed word-art designs, and part of every order supports Georgia dog rescues.\n\n[OFFER — e.g. free shipping on launch week, or a launch discount code].\n\nShop now: [LINK]",
       },
       {
-        title: "Try-on Reel",
+        title: "Adopt-don't-shop Reel",
         channel: "TikTok",
         dayOffset: 13,
         est_minutes: 50,
-        intent_tag: "TRUST",
+        intent_tag: "RETENTION",
         campaign_phase: "Launch",
-        draft_copy: "Real athletes. Real fit. See EcoFlex on three body types. Link in bio to shop.",
+        draft_copy: "Quick Reel: Show 3-4 rescue dogs wearing or posing near Fibwear shirts. On-screen text: \"Every shirt gives back. Every dog deserves a home.\" Caption: Adopt don't shop. Shop at fibwear.com. Link in bio.",
       },
       {
-        title: "Community challenge",
+        title: "Customer photo challenge",
         channel: "Instagram",
         dayOffset: 16,
         est_minutes: 20,
         intent_tag: "ENGAGEMENT",
         campaign_phase: "Grow",
-        draft_copy: "Show us your EcoFlex fit. Tag #MyEcoFlex for a chance to be featured. Three winners get a free set!",
+        draft_copy: "Show us your dog in a Fibwear shirt. Tag #MyDogMyFibwear for a chance to be featured. [OFFER — e.g. three winners get a free shirt].",
       },
       {
-        title: "Restock alert email",
+        title: "Bestseller restock email",
         channel: "Email",
         dayOffset: 19,
         est_minutes: 30,
         intent_tag: "CONVERSION",
         campaign_phase: "Grow",
-        draft_copy: "Subject: Back in stock — your size is waiting.\n\nThe bestsellers are back. Don't miss them twice.",
+        draft_copy: "Subject: Back in stock — your favorites are waiting.\n\nThe bestsellers are back at fibwear.com. Don't miss them twice. [OFFER — e.g. restock discount or free shipping].",
       },
     ],
   },
@@ -161,7 +161,7 @@ export const DEMO_TEMPLATES: DemoCampaignTemplate[] = [
         channel: "Instagram",
         dayOffset: 3,
         est_minutes: 35,
-        intent_tag: "TRUST",
+        intent_tag: "RETENTION",
         campaign_phase: "Prep",
         draft_copy: "Meet our new single-origin beans from Ethiopia. Watch the roast, smell the difference.",
       },
@@ -206,7 +206,7 @@ export const DEMO_TEMPLATES: DemoCampaignTemplate[] = [
         channel: "Instagram",
         dayOffset: 11,
         est_minutes: 15,
-        intent_tag: "TRUST",
+        intent_tag: "RETENTION",
         campaign_phase: "Grow",
         draft_copy: "We love seeing your Bloom moments. Tag #BloomCoffee for a chance to be featured. This week's pick from @local_morning.",
       },
@@ -257,7 +257,7 @@ export const DEMO_TEMPLATES: DemoCampaignTemplate[] = [
         channel: "TikTok",
         dayOffset: 4,
         est_minutes: 45,
-        intent_tag: "TRUST",
+        intent_tag: "RETENTION",
         campaign_phase: "Prep",
         draft_copy: "Video idea: Quick clips of unpacking inventory, hanging garments, styling racks and close-ups of textures.\n\nCaption: Before the collection hits the rack… this is what it looks like behind the scenes. Boxes everywhere. Outfit combinations everywhere. And yes — we're already picking favorites. Fall Capsule coming soon.",
       },
@@ -284,7 +284,7 @@ export const DEMO_TEMPLATES: DemoCampaignTemplate[] = [
         channel: "TikTok",
         dayOffset: 10,
         est_minutes: 50,
-        intent_tag: "TRUST",
+        intent_tag: "RETENTION",
         campaign_phase: "Build",
         draft_copy: "Video: LOOK 1: Casual, LOOK 2: Work, LOOK 3: Weekend\n\nCaption: One piece. Three completely different moods. That's exactly what we wanted from this collection. Which look are you wearing — 1, 2 or 3?\n\n(Cross-post as Instagram Reel after publishing to TikTok.)",
       },
@@ -338,7 +338,7 @@ export const DEMO_TEMPLATES: DemoCampaignTemplate[] = [
         channel: "Instagram",
         dayOffset: 20,
         est_minutes: 30,
-        intent_tag: "TRUST",
+        intent_tag: "RETENTION",
         campaign_phase: "Grow",
         draft_copy: "There are hundreds of pieces we could put in the shop. So why these?\n\nEvery item in our Fall Capsule was chosen because it passed one test: Can you actually wear it more than one way?\n\nWe want your closet filled with pieces you love wearing — not pieces that still have tags on them six months later. That's the heart behind this collection.\n\n(Cross-post to Facebook page after publishing to Instagram.)",
       },
@@ -347,7 +347,7 @@ export const DEMO_TEMPLATES: DemoCampaignTemplate[] = [
         channel: "Instagram",
         dayOffset: 23,
         est_minutes: 25,
-        intent_tag: "TRUST",
+        intent_tag: "RETENTION",
         campaign_phase: "Grow",
         draft_copy: "We suspected you might love this one. You proved us right.\n\n[Rescue Apparel] is quickly becoming one of the favorites from our Fall Capsule. Here's why:\n\n- Easy to layer\n- Dresses up or down\n- Works with pieces already in your closet\n\nHave you tried it yet?",
       },
@@ -430,13 +430,17 @@ export function buildAllDemoCampaigns(): { campaigns: Campaign[]; tasksByCampaig
   return { campaigns, tasksByCampaign };
 }
 
+const DEMO_DATA_VERSION = 2;
+const DEMO_STORAGE_KEY = "planshift-demo-campaigns";
+
 export function loadDemoState(): { campaigns: Campaign[]; tasksByCampaign: Record<string, Task[]> } | null {
-  const stored = localStorage.getItem("planshift-demo-campaigns");
+  const stored = localStorage.getItem(DEMO_STORAGE_KEY);
   if (stored) {
     try {
       const parsed = JSON.parse(stored);
+      if (parsed.version !== DEMO_DATA_VERSION) return null;
       if (parsed.campaigns && parsed.tasksByCampaign && parsed.campaigns.length > 0) {
-        return parsed;
+        return { campaigns: parsed.campaigns, tasksByCampaign: parsed.tasksByCampaign };
       }
     } catch { /* empty */ }
   }
@@ -444,7 +448,7 @@ export function loadDemoState(): { campaigns: Campaign[]; tasksByCampaign: Recor
 }
 
 export function saveDemoState(campaigns: Campaign[], tasksByCampaign: Record<string, Task[]>): void {
-  localStorage.setItem("planshift-demo-campaigns", JSON.stringify({ campaigns, tasksByCampaign }));
+  localStorage.setItem(DEMO_STORAGE_KEY, JSON.stringify({ version: DEMO_DATA_VERSION, campaigns, tasksByCampaign }));
 }
 
 export function initDemoState(): { campaigns: Campaign[]; tasksByCampaign: Record<string, Task[]> } {

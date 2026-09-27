@@ -1115,7 +1115,7 @@ function CompactCampaignRow({ campaign, tasks, onOpen }: { campaign: Campaign; t
         <div style={{ ...compactProgressInnerStyle, width: `${total > 0 ? (completed / total) * 100 : 0}%` }} />
       </div>
       <div style={compactProgressTextStyle}>
-        {completed}/{total} tasks
+        {completed}/{total} {total === 1 ? "task" : "tasks"}
       </div>
     </div>
   );

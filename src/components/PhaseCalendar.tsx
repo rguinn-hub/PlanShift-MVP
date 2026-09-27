@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import type { Task, CampaignPhase } from "../lib/types";
-import { PHASES } from "../lib/types";
+import { PHASES, migratePhase } from "../lib/types";
 import { channelIcons, channelColors, intentTagColors, intentTagBg } from "../lib/channels";
 import {
   statusLabel,
@@ -36,18 +36,21 @@ export default function PhaseCalendar({ tasks, startDate, durationDays, onTaskCl
   const phases = useMemo<PhaseGroup[]>(() => {
     const start = new Date(startDate + "T00:00:00");
     const totalMs = durationDays * 86400000;
+    const campaign = { start_date: startDate, duration_days: durationDays };
 
-    return PHASES.map((phase) => {
-      const phaseStart = new Date(start.getTime() + phase.startPct * totalMs);
-      const phaseEnd = new Date(start.getTime() + phase.endPct * totalMs);
+    const grouped: Record<CampaignPhase, Task[]> = {
+      Prep: [],
+      Build: [],
+      Launch: [],
+      Grow: [],
+    };
 
-      const phaseTasks = tasks.filter((t) => {
-        const due = new Date(t.due_date + "T00:00:00");
-        return due >= phaseStart && due < phaseEnd;
-      });
+    for (const t of tasks) {
+      const phase = migratePhase(t.campaign_phase, t.due_date, campaign);
+      grouped[phase].push(t);
+    }
 
-      return { name: phase.name, tasks: phaseTasks };
-    });
+    return PHASES.map((phase) => ({ name: phase.name, tasks: grouped[phase.name] }));
   }, [tasks, startDate, durationDays]);
 
   return (
@@ -57,7 +60,7 @@ export default function PhaseCalendar({ tasks, startDate, durationDays, onTaskCl
           <div style={phaseHeaderStyle}>
             <div style={{ ...phaseDotStyle, background: phaseColors[phase.name] }} />
             <h2 style={phaseTitleStyle}>{phase.name}</h2>
-            <span style={phaseCountStyle}>{phase.tasks.length} tasks</span>
+            <span style={phaseCountStyle}>{phase.tasks.length} {phase.tasks.length === 1 ? "task" : "tasks"}</span>
           </div>
 
           {phase.tasks.length === 0 ? (
