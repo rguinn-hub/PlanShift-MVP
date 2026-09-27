@@ -102,14 +102,34 @@ export const INTENT_TAGS: IntentTag[] = [
   "RETENTION",
 ];
 
-export type CampaignPhase = "Tease" | "Build-Up" | "Launch" | "Momentum";
+export type CampaignPhase = "Prep" | "Build" | "Launch" | "Grow";
 
 export const PHASES: { name: CampaignPhase; startPct: number; endPct: number }[] = [
-  { name: "Tease", startPct: 0, endPct: 0.2 },
-  { name: "Build-Up", startPct: 0.2, endPct: 0.5 },
+  { name: "Prep", startPct: 0, endPct: 0.25 },
+  { name: "Build", startPct: 0.25, endPct: 0.5 },
   { name: "Launch", startPct: 0.5, endPct: 0.75 },
-  { name: "Momentum", startPct: 0.75, endPct: 1 },
+  { name: "Grow", startPct: 0.75, endPct: 1 },
 ];
+
+const PHASE_MIGRATION: Record<string, CampaignPhase> = {
+  Tease: "Prep",
+  "Build-Up": "Build",
+  Momentum: "Grow",
+  Sustain: "Grow",
+};
+
+export function migratePhase(phase: string | null, dueDate: string, campaign: { start_date: string; duration_days: number }): CampaignPhase {
+  if (phase && (PHASES.some((p) => p.name === phase))) return phase as CampaignPhase;
+  if (phase && PHASE_MIGRATION[phase]) return PHASE_MIGRATION[phase];
+  const start = new Date(campaign.start_date + "T00:00:00");
+  const due = new Date(dueDate + "T00:00:00");
+  const totalMs = campaign.duration_days * 86400000;
+  const pct = (due.getTime() - start.getTime()) / totalMs;
+  for (const p of PHASES) {
+    if (pct >= p.startPct && pct < p.endPct) return p.name;
+  }
+  return "Grow";
+}
 
 export type UrgencyLevel = "red" | "orange" | "yellow" | "green";
 

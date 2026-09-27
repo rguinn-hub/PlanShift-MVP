@@ -315,7 +315,7 @@ function generateTasks(input: CampaignInput): GeneratedTask[] {
     draft_copy: launchDraft(input),
     est_minutes: 30,
     intent_tag: "AWARENESS",
-    campaign_phase: null,
+    campaign_phase: phaseForDayOffset(0, totalDays),
     sort_order: 0,
   });
 
@@ -336,7 +336,7 @@ function generateTasks(input: CampaignInput): GeneratedTask[] {
       draft_copy: tmpl.draft(input),
       est_minutes: tmpl.est_minutes,
       intent_tag: tmpl.intent_tag,
-      campaign_phase: null,
+      campaign_phase: phaseForDayOffset(dayOffset, totalDays),
       sort_order: i + 1,
     });
   }
@@ -348,7 +348,7 @@ function generateTasks(input: CampaignInput): GeneratedTask[] {
     draft_copy: reviewDraft(input),
     est_minutes: 45,
     intent_tag: "RETENTION",
-    campaign_phase: null,
+    campaign_phase: phaseForDayOffset(totalDays - 1, totalDays),
     sort_order: tasks.length,
   });
 
@@ -364,7 +364,15 @@ function dateStr(start: Date, dayOffset: number): string {
 
 const VALID_CHANNELS = ["Instagram", "Facebook", "TikTok", "Email", "Website"];
 const VALID_INTENT_TAGS = ["AWARENESS", "ENGAGEMENT", "RETENTION", "CONVERSION"];
-const VALID_PHASES = ["Launch", "Grow", "Sustain"];
+const VALID_PHASES = ["Prep", "Build", "Launch", "Grow"];
+
+function phaseForDayOffset(dayOffset: number, totalDays: number): string {
+  const pct = dayOffset / totalDays;
+  if (pct < 0.25) return "Prep";
+  if (pct < 0.5) return "Build";
+  if (pct < 0.75) return "Launch";
+  return "Grow";
+}
 
 function buildOpenAIPrompt(input: CampaignInput): string {
   const targetCount = Math.round(Math.max(8, Math.min(25, (input.durationDays / 30) * 18)));
@@ -463,7 +471,7 @@ async function generateTasksWithAI(input: CampaignInput): Promise<GeneratedTask[
       draft_copy: String(t.draft_copy || "").slice(0, 5000),
       est_minutes: Math.max(5, Math.min(180, Math.round(t.est_minutes || 30))),
       intent_tag: VALID_INTENT_TAGS.includes(t.intent_tag) ? t.intent_tag : "AWARENESS",
-      campaign_phase: t.campaign_phase && VALID_PHASES.includes(t.campaign_phase) ? t.campaign_phase : null,
+      campaign_phase: t.campaign_phase && VALID_PHASES.includes(t.campaign_phase) ? t.campaign_phase : phaseForDayOffset(Math.max(0, Math.min(input.durationDays - 1, Math.round(t.day_offset || 0))), input.durationDays),
       sort_order: i,
     }));
 

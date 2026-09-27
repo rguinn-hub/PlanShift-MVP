@@ -26,10 +26,10 @@ interface PhaseGroup {
 }
 
 const phaseColors: Record<CampaignPhase, string> = {
-  "Tease": "#85bdbd",
-  "Build-Up": "#549e9e",
+  "Prep": "#85bdbd",
+  "Build": "#549e9e",
   "Launch": "#2c6e6e",
-  "Momentum": "#245858",
+  "Grow": "#245858",
 };
 
 export default function PhaseCalendar({ tasks, startDate, durationDays, onTaskClick }: Props) {
